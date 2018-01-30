@@ -1,9 +1,9 @@
 package org.usfirst.frc.team4454.robot;
 
-
 import java.lang.Math;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Arrays;
 
 import edu.wpi.first.wpilibj.vision.VisionPipeline;
 
@@ -19,20 +19,136 @@ public class OurVisionPipeline implements VisionPipeline {
 
 	// Process Parameters
 	double[] hsvThresholdHue = {0.0, 255.0};
-	double[] hsvThresholdSaturation = {0.0, 255.0};
+	double[] hsvThresholdSaturation = {21.0, 255.0};
 	double[] hsvThresholdValue = {0.0, 255.0};
 
-	double filterContoursMinArea = 40.0;
+	double filterContoursMinArea = 200.0;
 	double filterContoursMinPerimeter = 0;
 	double filterContoursMinWidth = 10;
 	double filterContoursMaxWidth = 1000;
-	double filterContoursMinHeight = 10;
+	double filterContoursMinHeight = 0;
 	double filterContoursMaxHeight = 1000;
 	double[] filterContoursSolidity = {0, 100};
-	double filterContoursMaxVertices = 1000000;
+	double filterContoursMaxVertices = 100;
 	double filterContoursMinVertices = 0;
 	double filterContoursMinRatio = 0.3;
 	double filterContoursMaxRatio = 0.5;
+	
+	double aspectRatioOut = 0.0;
+	
+	int contourNumber = 0;
+	
+	int pipelineRunning = 0;
+	
+	public void setVariable(String variable, double input) {
+		if (variable == "filterContoursMinArea") {
+			filterContoursMinArea = input;
+		}
+		
+		if (variable == "filterContoursMinRatio") {
+			filterContoursMinRatio = input;
+		}
+		
+		if (variable == "filterContoursMaxRatio") {
+			filterContoursMaxRatio = input;
+		}
+		
+		if (variable == "filterContoursMinPerimeter") {
+			filterContoursMinPerimeter = input;
+		}
+		
+		if (variable == "filterContoursMinWidth") {
+			filterContoursMinWidth = input;
+		}
+		
+		if (variable == "filterContoursMaxWidth") {
+			filterContoursMaxWidth = input;
+		}
+		
+		if (variable == "filterContoursMinHeight") {
+			filterContoursMinHeight = input;
+		}
+		
+		if (variable == "filterContoursMinHeight") {
+			filterContoursMaxHeight = input;
+		}
+		
+		if (variable == "filterContoursMaxVertices") {
+			filterContoursMaxVertices = input;
+		}
+		
+		if (variable == "filterContoursMinVertices") {
+			filterContoursMinVertices = input;
+		}
+	}
+	
+	public void setArray(String variable, String input) {
+		String[] items = input.replaceAll("\\[", "").replaceAll("\\]", "").replaceAll("\\s", "").split(",");
+
+		double[] results = new double[items.length];
+
+		for (int i = 0; i < items.length; i++) {
+		    try {
+		        results[i] = Double.parseDouble(items[i]);
+		        
+		        if (variable == "hsvThresholdHue") {
+		        	hsvThresholdHue = results;
+		        }
+		        
+		        if (variable == "hsvThresholdSaturation") {
+		        	hsvThresholdSaturation = results;
+		        }
+		        
+		        if (variable == "hsvThresholdValue") {
+		        	hsvThresholdValue = results;
+		        }
+		        
+		        if (variable == "filterContoursSolidity") {
+		        	filterContoursSolidity = results;
+		        }
+		    } catch (NumberFormatException nfe) {
+		    	
+		    };
+		}
+	}
+	
+	public double getVariable(String variable) {
+		if (variable == "filterContoursMinArea") {
+			return filterContoursMinArea;
+		} else if (variable == "filterContoursMinRatio") {
+			return filterContoursMinRatio;
+		} else if (variable == "filterContoursMaxRatio") {
+			return filterContoursMaxRatio;
+		} else if (variable == "filterContoursMinPerimeter") {
+			return filterContoursMinPerimeter;
+		} else if (variable == "filterContoursMinWidth") {
+			return filterContoursMinWidth;
+		} else if (variable == "filterContoursMaxWidth") {
+			return filterContoursMaxWidth;
+		} else if (variable == "filterContoursMinHeight") {
+			return filterContoursMinHeight;
+		} else if (variable == "filterContoursMinHeight") {
+			return filterContoursMaxHeight;
+		} else if (variable == "filterContoursMaxVertices") {
+			return filterContoursMaxVertices;
+		} else if (variable == "filterContoursMinVertices") {
+			return filterContoursMinVertices;
+		} else {
+			return -0.0;
+		}
+	}
+	
+	public String getArray(String variable) {
+		if (variable == "hsvThresholdHue") {
+        	return Arrays.toString(hsvThresholdHue);
+        } else if (variable == "hsvThresholdSaturation") {
+        	return Arrays.toString(hsvThresholdSaturation);
+        } else if (variable == "hsvThresholdValue") {
+        	return Arrays.toString(hsvThresholdValue);
+        } else {
+        	return "";
+        }
+	}
 
 	// Outputs
 	// This needs to be initialized or hsvThreshold fails with a null pointer exception
@@ -201,6 +317,10 @@ public class OurVisionPipeline implements VisionPipeline {
 
 
 	private void findTarget (List<MatOfPoint> inputContours) {
+		pipelineRunning++;
+		if (pipelineRunning > 1000) {
+			pipelineRunning = 0;
+		}
 		int n = inputContours.size();
 		int i, j;
 		Rect r1, r2;
@@ -211,15 +331,21 @@ public class OurVisionPipeline implements VisionPipeline {
 		if (n >= 2) {
 			for (i = 0; i < n; ++i) {
 				r1 = Imgproc.boundingRect(inputContours.get(i));
+				
+				contourNumber = inputContours.size();
+				
+				Imgproc.rectangle(overlayOutput, 
+						new Point(r1.x, r1.y), 
+						new Point(r1.x + r1.width, r1.y + r1.height), 
+						new Scalar(225, 0, 0));
 
 				for (j = (i+1); j < n; ++j) {
 					r2 = Imgproc.boundingRect(inputContours.get(j));
 
 					// compute y center of r2 relative to r1
-					temp = (r2.y + 0.5*r2.height) - r1.y;
+					temp = (r2.y + 0.5 * r2.height) - r1.y;
 
 					if ( (temp >= 0.0) && (temp <= r1.height) ) {
-
 						targetTop    = Math.min(r1.y, r2.y);
 						targetBottom = Math.max(r1.y+r1.height, r2.y+r2.height);
 
@@ -230,14 +356,16 @@ public class OurVisionPipeline implements VisionPipeline {
 						targetWidth  = targetRight - targetLeft;
 
 						aspectRatio = (double)targetHeight / (double)targetWidth;
+						
+						aspectRatioOut = aspectRatio;
 
 						//targetDistance = 4 * 4 * 240 / (2 * targetHeight); // rough distance in inches (+/- 4)
 						
-						targetDistance = (2/3) * 240 / (2 * targetWidth * 0.5934352563);
+						//targetDistance = (2/3) * 240 / (2 * targetWidth * 0.5934352563);
 						
-						System.out.println("Target Distance: " + targetDistance);
+						targetDistance = (8 / targetWidth) * 346;
 
-						if (Math.abs(aspectRatio - (8.0/16.0)) < 0.1) {
+						if (Math.abs(aspectRatio - (6.0/8.0)) < 0.1) { // 8.0,16.0
 							foundTarget = true;
 
 							Imgproc.rectangle(overlayOutput, 

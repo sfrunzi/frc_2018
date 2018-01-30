@@ -17,8 +17,11 @@ import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.SpeedControllerGroup;
 import edu.wpi.first.wpilibj.Jaguar;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+
 import com.kauailabs.navx.frc.AHRS;
 import edu.wpi.first.wpilibj.vision.VisionThread;
+import com.ctre.phoenix.motorcontrol.can.TalonSRX;
 
 /**
  * This is a demo program showing the use of the RobotDrive class, specifically
@@ -29,8 +32,14 @@ public class Robot extends IterativeRobot {
 	CvSource intakeOutputStream;
 	VisionThread intakeVisionThread;
 	
+	int contourNumber = 0;
+	
+	int pipelineRunning = 0;
+	
 	int exposureValue = 10;
 	boolean exposureChanged = false;
+	
+	boolean foundTarget = false;
 	
 	// Vision Parameters
 	double hueMin = 50;
@@ -47,6 +56,8 @@ public class Robot extends IterativeRobot {
 	
 	double targetDistance;
 	
+	double aspectRatio;
+	
 	AHRS ahrs;
 	
     Jaguar frontLeft = new Jaguar(0);
@@ -58,6 +69,13 @@ public class Robot extends IterativeRobot {
     SpeedControllerGroup right = new SpeedControllerGroup(frontRight, rearRight);
 
     DifferentialDrive drive = new DifferentialDrive(left, right);
+    
+    TalonSRX intakeLeft;
+    TalonSRX intakeRight;
+    TalonSRX rampLeft;
+    TalonSRX rampRight;
+    TalonSRX climberTop;
+    TalonSRX climberBottom;
     
     int controllerMode = 1; // 1 is normal, 2 is experimental Attack 3 mode, and 3 is Joystick normal
     
@@ -127,9 +145,18 @@ public class Robot extends IterativeRobot {
 
 	@Override
 	public void robotInit() {
-		intakeCamera.setResolution(427, 240);
+		intakeLeft = new TalonSRX(4);
+	    intakeRight  = new TalonSRX(5);
+	    rampLeft = new TalonSRX(6);
+	    rampRight = new TalonSRX(7);
+	    climberTop = new TalonSRX(8);
+	    climberBottom = new TalonSRX(9);
+		
+		intakeCamera.setResolution(320, 240);
+		//intakeCamera.setFPS(5);
 		
 		intakeOutputStream = CameraServer.getInstance().putVideo("intakeOverlay", 320, 240);
+		//intakeOutputStream.setFPS(5);
 		
 		leftStick = new Joystick(0);
 		rightStick = new Joystick(1);
@@ -152,16 +179,54 @@ public class Robot extends IterativeRobot {
 		} catch (RuntimeException ex ) {
 			DriverStation.reportError("Error instantiating navX MXP:  " + ex.getMessage(), true);
 		}
-		
-		intakeVisionThread = new VisionThread(intakeCamera, new OurVisionPipeline(),
+		 
+		/*intakeVisionThread = new VisionThread(intakeCamera, new OurVisionPipeline(),
 				pipeline->{
-					intakeOutputStream.putFrame(pipeline.overlayOutput());
+					double filterContoursMinArea = SmartDashboard.getNumber("filterContoursMinArea", 40.0);
+					double filterContoursMinPerimeter = SmartDashboard.getNumber("filterContoursMinPerimeter", 0);
+					double filterContoursMaxWidth = SmartDashboard.getNumber("filterContoursMaxWidth", 1000);
+					double filterContoursMinWidth = SmartDashboard.getNumber("filterContoursMinWidth", 10);
+					double filterContoursMaxHeight = SmartDashboard.getNumber("filterContoursMaxHeight", 1000);
+					double filterContoursMinHeight = SmartDashboard.getNumber("filterContoursMinHeight", 10);
+					double filterContoursMaxVertices = SmartDashboard.getNumber("filterContoursMaxVertices", 1000000);
+					double filterContoursMinVertices = SmartDashboard.getNumber("filterContoursMinVertices", 0);
+					double filterContoursMinRatio = SmartDashboard.getNumber("filterContoursMinRatio", 0.3);
+					double filterContoursMaxRatio = SmartDashboard.getNumber("filterContoursMaxRatio", 0.5);
+					
+					String hsvThresholdHue = SmartDashboard.getString("hsvThresholdHue","[0.0, 255.0]");
+					String hsvThresholdSaturation = SmartDashboard.getString("hsvThresholdSaturation", "[21.0, 255.0]");
+					String hsvThresholdValue = SmartDashboard.getString("hsvThresholdValue", "[0.0, 255.0]");
+					String filterContoursSolidity =SmartDashboard.getString("filterContoursSolidity", "[0, 100]");
+					
+					pipeline.setVariable("filterContoursMinArea", filterContoursMinArea);
+					pipeline.setVariable("filterContoursMinPerimeter", filterContoursMinPerimeter);
+					pipeline.setVariable("filterContoursMinWidth", filterContoursMinWidth);
+					pipeline.setVariable("filterContoursMaxWidth", filterContoursMaxWidth);
+					pipeline.setVariable("filterContoursMinHeight", filterContoursMinHeight);
+					pipeline.setVariable("filterContoursMaxHeight", filterContoursMaxHeight);
+					pipeline.setVariable("filterContoursMaxVertices", filterContoursMaxVertices);
+					pipeline.setVariable("filterContoursMinVertices", filterContoursMinVertices);
+					pipeline.setVariable("filterContoursMinRatio", filterContoursMinRatio);
+					pipeline.setVariable("filterContoursMaxRatio", filterContoursMaxRatio);
+					
+					pipeline.setArray("hsvThresholdHue", hsvThresholdHue);
+					pipeline.setArray("hsvThresholdSaturation", hsvThresholdSaturation);
+					pipeline.setArray("hsvThresholdValue", hsvThresholdValue);
+					pipeline.setArray("filterContoursSolidity", filterContoursSolidity);
+				
+					intakeOutputStream.putFrame(pipeline.hsvThresholdOutput());
 
 					if (pipeline.foundTarget) {
 						targetDistance = pipeline.targetDistance;
 					} else {
 						targetDistance = -1.0;
 					}
+					
+					aspectRatio = pipeline.aspectRatioOut;
+					
+					foundTarget = pipeline.foundTarget;
+					contourNumber = pipeline.contourNumber;
+					pipelineRunning = pipeline.pipelineRunning;
 					
 					if (exposureChanged) {
 						intakeCamera.setExposureManual(exposureValue);
@@ -178,11 +243,12 @@ public class Robot extends IterativeRobot {
 					pipeline.hsvThresholdValue[1] = valMax;
 				});
 		
-		intakeVisionThread.start();
+		intakeVisionThread.start();*/
 	}
 	
 	@Override
 	public void teleopInit() {
+		SmartDashboard.putNumber("filterContoursMinArea", 200.0);
 		ahrs.zeroYaw();
 	}
 
@@ -216,5 +282,11 @@ public class Robot extends IterativeRobot {
 			adaptiveDrive(scale * (-1 * operatorStick.getRawAxis(1)), scale * (-1 * operatorStick.getRawAxis(5)));
 		}
 		
+		SmartDashboard.putNumber("Target Distance:", targetDistance);
+		SmartDashboard.putNumber("Aspect Ratio:", aspectRatio);
+		SmartDashboard.putNumber("Countour Number:", contourNumber);
+		SmartDashboard.putNumber("Running:", pipelineRunning);
+		SmartDashboard.putBoolean("Target Found:", foundTarget);
+	
 	}
 }

@@ -19,12 +19,12 @@ public class OurVisionPipeline implements VisionPipeline {
 
 	// Process Parameters
 	double[] hsvThresholdHue = {0.0, 255.0};
-	double[] hsvThresholdSaturation = {21.0, 255.0};
+	double[] hsvThresholdSaturation = {15.0, 255.0};
 	double[] hsvThresholdValue = {0.0, 255.0};
 
-	double filterContoursMinArea = 200.0;
+	double filterContoursMinArea = 150.0;
 	double filterContoursMinPerimeter = 0;
-	double filterContoursMinWidth = 10;
+	double filterContoursMinWidth = 4;
 	double filterContoursMaxWidth = 1000;
 	double filterContoursMinHeight = 0;
 	double filterContoursMaxHeight = 1000;
@@ -40,7 +40,10 @@ public class OurVisionPipeline implements VisionPipeline {
 	
 	int pipelineRunning = 0;
 	
+	double targetAngle = 0.0;
+	
 	public void setVariable(String variable, double input) {
+		
 		if (variable == "filterContoursMinArea") {
 			filterContoursMinArea = input;
 		}
@@ -69,7 +72,7 @@ public class OurVisionPipeline implements VisionPipeline {
 			filterContoursMinHeight = input;
 		}
 		
-		if (variable == "filterContoursMinHeight") {
+		if (variable == "filterContoursMaxHeight") {
 			filterContoursMaxHeight = input;
 		}
 		
@@ -171,6 +174,7 @@ public class OurVisionPipeline implements VisionPipeline {
 	 * This is the primary method that runs the entire pipeline and updates the outputs.
 	 */
 	public void process(Mat source0) {
+		
 		// Step HSV_Threshold0:
 		Mat hsvThresholdInput = source0;
 
@@ -249,6 +253,8 @@ public class OurVisionPipeline implements VisionPipeline {
 	 * @param output The image in which to store the output.
 	 */
 	private void findContours(Mat input, boolean externalOnly, List<MatOfPoint> contours) {
+		Rect r1;
+		
 		Mat hierarchy = new Mat();
 		contours.clear();
 		int mode;
@@ -259,7 +265,19 @@ public class OurVisionPipeline implements VisionPipeline {
 			mode = Imgproc.RETR_LIST;
 		}
 		int method = Imgproc.CHAIN_APPROX_SIMPLE;
+		
 		Imgproc.findContours(input, contours, hierarchy, mode, method);
+		
+		/*int n = contours.size();
+		
+		for (int i = 0; i < n; ++i) {
+			r1 = Imgproc.boundingRect(contours.get(i));
+		
+			Imgproc.rectangle(overlayOutput, 
+					new Point(r1.x, r1.y), 
+					new Point(r1.x + r1.width, r1.y + r1.height), 
+					new Scalar(225, 0, 0));
+		}*/
 	}
 
 
@@ -285,6 +303,7 @@ public class OurVisionPipeline implements VisionPipeline {
 			minRatio, double maxRatio, List<MatOfPoint> output) {
 		// final MatOfInt hull = new MatOfInt();
 		output.clear();
+		
 		//operation
 		for (int i = 0; i < inputContours.size(); i++) {
 			final MatOfPoint contour = inputContours.get(i);
@@ -327,12 +346,12 @@ public class OurVisionPipeline implements VisionPipeline {
 		double temp, aspectRatio;
 
 		foundTarget = false;
+		
+		contourNumber = inputContours.size();
 
 		if (n >= 2) {
 			for (i = 0; i < n; ++i) {
 				r1 = Imgproc.boundingRect(inputContours.get(i));
-				
-				contourNumber = inputContours.size();
 				
 				Imgproc.rectangle(overlayOutput, 
 						new Point(r1.x, r1.y), 
@@ -363,7 +382,13 @@ public class OurVisionPipeline implements VisionPipeline {
 						
 						//targetDistance = (2/3) * 240 / (2 * targetWidth * 0.5934352563);
 						
-						targetDistance = (8 / targetWidth) * 346;
+						targetDistance = (8.0 / targetWidth) * 346.0;
+						
+						double targetCenter = targetLeft + (targetWidth / 2.0);
+						
+						double distanceCenterTarget = targetCenter - 160.0;
+						
+						targetAngle = 0.5934352563 * (distanceCenterTarget / 320);
 
 						if (Math.abs(aspectRatio - (6.0/8.0)) < 0.1) { // 8.0,16.0
 							foundTarget = true;

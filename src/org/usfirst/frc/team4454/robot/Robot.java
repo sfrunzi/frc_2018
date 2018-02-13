@@ -7,26 +7,25 @@
 
 package org.usfirst.frc.team4454.robot;
 
+import com.ctre.phoenix.motorcontrol.ControlMode;
+import com.ctre.phoenix.motorcontrol.can.TalonSRX;
+import com.kauailabs.navx.frc.AHRS;
+
 import edu.wpi.cscore.CvSource;
 import edu.wpi.cscore.UsbCamera;
 import edu.wpi.first.wpilibj.CameraServer;
+import edu.wpi.first.wpilibj.CounterBase;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.SPI;
-import edu.wpi.first.wpilibj.SpeedControllerGroup;
-import edu.wpi.first.wpilibj.Jaguar;
-import edu.wpi.first.wpilibj.drive.DifferentialDrive;
+import edu.wpi.first.wpilibj.Ultrasonic;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-
-import com.kauailabs.navx.frc.AHRS;
 import edu.wpi.first.wpilibj.vision.VisionThread;
-import com.ctre.phoenix.motorcontrol.can.TalonSRX;
+import edu.wpi.first.wpilibj.networktables.NetworkTable;
 
-/**
- * This is a demo program showing the use of the RobotDrive class, specifically
- * it contains the code necessary to operate a robot with tank drive.
- */
+@SuppressWarnings("deprecation")
 public class Robot extends IterativeRobot {
 	UsbCamera intakeCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.1:1.0-video-index0");
 	CvSource intakeOutputStream;
@@ -54,21 +53,42 @@ public class Robot extends IterativeRobot {
 	double I = 0.0;
 	double D = 1.0;
 	
+	//Test Variables
+	String switchSide = "left";
+	int robotPosition = 1;
+	
+	String autonMode;
+	String autonSwitchPlace = "forward";
+	double autonCrossDistance;
+	
+	double autonDistance;
+	
+	double inchPerSecond = 3.0;
+	
 	double targetDistance;
 	
 	double aspectRatio;
 	
+	boolean firstTimeAuton = true;
+	boolean autonTurnDone = false;
+	
+	double autonCrossTime;
+	double autonCrossWait = 3000;
+	
+	double autonPlaceTime;
+	double autonPlaceWait = 3000;
+	
+	double autonSpeed;
+	
 	AHRS ahrs;
 	
-    Jaguar frontLeft = new Jaguar(0);
-    Jaguar rearLeft = new Jaguar(1);
-    SpeedControllerGroup left = new SpeedControllerGroup(frontLeft, rearLeft);
+	TalonSRX frontLeft = new TalonSRX(1);
+	TalonSRX middleLeft = new TalonSRX(2);
+    TalonSRX rearLeft = new TalonSRX(3);
 
-    Jaguar frontRight = new Jaguar(2);
-    Jaguar rearRight = new Jaguar(3);
-    SpeedControllerGroup right = new SpeedControllerGroup(frontRight, rearRight);
-
-    DifferentialDrive drive = new DifferentialDrive(left, right);
+    TalonSRX frontRight = new TalonSRX(4);
+    TalonSRX middleRight = new TalonSRX(5);
+    TalonSRX rearRight = new TalonSRX(6);
     
     TalonSRX intakeLeft;
     TalonSRX intakeRight;
@@ -76,6 +96,30 @@ public class Robot extends IterativeRobot {
     TalonSRX rampRight;
     TalonSRX climberTop;
     TalonSRX climberBottom;
+    
+    Ultrasonic leftUltrasonic = new Ultrasonic(1,1);
+    Ultrasonic rightUltrasonic = new Ultrasonic(2,2);
+    
+    Encoder encLeft;
+	Encoder encRight;
+	
+	NetworkTable table;
+	
+	int countR;
+	double rawDistanceR;
+	double distanceR;
+	double rateR;
+	boolean directionR;
+	boolean stoppedR;
+
+	int countL;
+	double rawDistanceL;
+	double distanceL;
+	double rateL;
+	boolean directionL;
+	boolean stoppedL;
+    
+    String gameData;
     
     int controllerMode = 1; // 1 is normal, 2 is experimental Attack 3 mode, and 3 is Joystick normal
     
@@ -89,6 +133,22 @@ public class Robot extends IterativeRobot {
 		} else {
 			return false;
 		}
+	}
+	
+	public void updateEncoders() {
+		countR = encRight.get();
+		rawDistanceR = encRight.getRaw();
+		distanceR = encRight.getDistance();
+		rateR = encRight.getRate();
+		directionR = encRight.getDirection();
+		stoppedR = encRight.getStopped();
+
+		countL = encLeft.get();
+		rawDistanceL = encLeft.getRaw();
+		distanceL = encLeft.getDistance();
+		rateL = encLeft.getRate();
+		directionL = encLeft.getDirection();
+		stoppedL = encLeft.getStopped();
 	}
 	
 	public double getDrivePowerScale() {
@@ -115,8 +175,22 @@ public class Robot extends IterativeRobot {
 		return scale;
 	}
 	
+	public double getLeftUltrasonic() {
+		return leftUltrasonic.getRangeInches();
+	}
+	
+	public double getRightUltrasonic() {
+		return rightUltrasonic.getRangeInches();
+	}
+	
 	public void setDriveMotors(double l, double r) {
-		drive.tankDrive(l, r);
+		frontRight.set(ControlMode.PercentOutput, r);
+		middleRight.set(ControlMode.PercentOutput, r);
+		rearRight.set(ControlMode.PercentOutput, r);
+
+		frontLeft.set(ControlMode.PercentOutput, l);
+		middleRight.set(ControlMode.PercentOutput, l);
+		rearLeft.set(ControlMode.PercentOutput, l);
 	}
 	
 	public void adaptiveDrive(double l, double r) {
@@ -142,9 +216,48 @@ public class Robot extends IterativeRobot {
 		setDriveMotors(l_out, r_out);
 	}
 	
+	void resetDistanceAndYaw () {
+		ahrs.zeroYaw();
+		//encLeft.reset();
+		//encRight.reset();
+	}
+	
 
 	@Override
 	public void robotInit() {
+		table = NetworkTable.getTable("SmartDashboard");
+		
+		frontLeft.setInverted(true);
+		middleLeft.setInverted(true);
+	    rearLeft.setInverted(true);
+	    
+		frontRight.setInverted(true);
+		middleRight.setInverted(true);
+	    rearRight.setInverted(true);
+		
+		leftUltrasonic.setAutomaticMode(true);
+		rightUltrasonic.setAutomaticMode(true);
+		
+		SmartDashboard.putNumber("filterContoursMinArea", 40.0);
+		SmartDashboard.putNumber("filterContoursMinPerimeter", 0);
+		SmartDashboard.putNumber("filterContoursMaxWidth", 1000);
+		SmartDashboard.putNumber("filterContoursMinWidth", 10);
+		SmartDashboard.putNumber("filterContoursMaxHeight", 1000);
+		SmartDashboard.putNumber("filterContoursMinHeight", 10);
+		SmartDashboard.putNumber("filterContoursMaxVertices", 1000000);
+		SmartDashboard.putNumber("filterContoursMinVertices", 0);
+		SmartDashboard.putNumber("filterContoursMinRatio", 0.3);
+		SmartDashboard.putNumber("filterContoursMaxRatio", 0.5);
+		SmartDashboard.putNumber("Auton Cross Distance", 119.0);
+		SmartDashboard.putNumber("Auton Speed", 0.65);
+		SmartDashboard.putNumber("Inch Per Second", 38.0);
+		
+		SmartDashboard.putString("Auton Mode","cross");
+		SmartDashboard.putString("hsvThresholdHue","[0.0, 255.0]");
+		SmartDashboard.putString("hsvThresholdSaturation", "[15.0, 255.0]");
+		SmartDashboard.putString("hsvThresholdValue", "[0.0, 255.0]");
+		SmartDashboard.putString("filterContoursSolidity", "[0, 100]");
+		
 		intakeLeft = new TalonSRX(4);
 	    intakeRight  = new TalonSRX(5);
 	    rampLeft = new TalonSRX(6);
@@ -180,7 +293,7 @@ public class Robot extends IterativeRobot {
 			DriverStation.reportError("Error instantiating navX MXP:  " + ex.getMessage(), true);
 		}
 		 
-		/*intakeVisionThread = new VisionThread(intakeCamera, new OurVisionPipeline(),
+		intakeVisionThread = new VisionThread(intakeCamera, new OurVisionPipeline(),
 				pipeline->{
 					double filterContoursMinArea = SmartDashboard.getNumber("filterContoursMinArea", 40.0);
 					double filterContoursMinPerimeter = SmartDashboard.getNumber("filterContoursMinPerimeter", 0);
@@ -194,7 +307,7 @@ public class Robot extends IterativeRobot {
 					double filterContoursMaxRatio = SmartDashboard.getNumber("filterContoursMaxRatio", 0.5);
 					
 					String hsvThresholdHue = SmartDashboard.getString("hsvThresholdHue","[0.0, 255.0]");
-					String hsvThresholdSaturation = SmartDashboard.getString("hsvThresholdSaturation", "[21.0, 255.0]");
+					String hsvThresholdSaturation = SmartDashboard.getString("hsvThresholdSaturation", "[15.0, 255.0]");
 					String hsvThresholdValue = SmartDashboard.getString("hsvThresholdValue", "[0.0, 255.0]");
 					String filterContoursSolidity =SmartDashboard.getString("filterContoursSolidity", "[0, 100]");
 					
@@ -213,8 +326,10 @@ public class Robot extends IterativeRobot {
 					pipeline.setArray("hsvThresholdSaturation", hsvThresholdSaturation);
 					pipeline.setArray("hsvThresholdValue", hsvThresholdValue);
 					pipeline.setArray("filterContoursSolidity", filterContoursSolidity);
+					
+					SmartDashboard.putNumber("Target Angel", pipeline.targetAngle);
 				
-					intakeOutputStream.putFrame(pipeline.hsvThresholdOutput());
+					intakeOutputStream.putFrame(pipeline.overlayOutput());
 
 					if (pipeline.foundTarget) {
 						targetDistance = pipeline.targetDistance;
@@ -233,27 +348,138 @@ public class Robot extends IterativeRobot {
 						exposureChanged = false;						
 					}
 
-					pipeline.hsvThresholdHue[0] = hueMin;
+					/*pipeline.hsvThresholdHue[0] = hueMin;
 					pipeline.hsvThresholdHue[1] = hueMax;
 
 					pipeline.hsvThresholdSaturation[0] = satMin;
 					pipeline.hsvThresholdSaturation[1] = satMax;
 
 					pipeline.hsvThresholdValue[0] = valMin;
-					pipeline.hsvThresholdValue[1] = valMax;
+					pipeline.hsvThresholdValue[1] = valMax;*/
 				});
 		
-		intakeVisionThread.start();*/
+		intakeVisionThread.start();
+		
+		encLeft = new Encoder(8, 9, false, CounterBase.EncodingType.k4X);
+
+		encLeft.setMaxPeriod(1);
+		encLeft.setMinRate(0.1);
+		encLeft.setDistancePerPulse(1.0/((4.0 * 25.4 / .001) * Math.PI / 360.0));
+		encLeft.setReverseDirection(false);
+		encLeft.setSamplesToAverage(7);
+
+		encRight = new Encoder(2, 3, false, CounterBase.EncodingType.k4X);
+		
+		encRight.setMaxPeriod(1);
+		encRight.setMinRate(0.1);
+		encRight.setDistancePerPulse(1.0/((4.0 * 25.4 / .001) * Math.PI / 360.0));
+		encRight.setReverseDirection(false);
+		encRight.setSamplesToAverage(7);
+	}
+	
+	public void autonCross() {
+		if (firstTimeAuton == true) {
+			firstTimeAuton = false;
+			autonCrossTime = System.currentTimeMillis();
+		}
+		
+		if ((System.currentTimeMillis() - autonCrossTime) <= ((autonCrossDistance / inchPerSecond) * 1000) + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
+			adaptiveDrive(1.0 * autonSpeed, 1.0 * autonSpeed);
+		} else {
+			adaptiveDrive(0, 0);
+		}
+	}
+	
+	public void autonTurn(double turnAngle, double turnPower) {
+		double temp = Math.signum(turnAngle) * turnPower;
+		setDriveMotors(temp, -temp);
+		if ((turnAngle == 0.0) || (Math.abs(ahrs.getAngle()) > Math.abs(turnAngle))) {
+			autonTurnDone = true;
+			setDriveMotors(0.0, 0.0);
+			resetDistanceAndYaw();
+		}
+	}
+	
+	public void autonPlace(double turnAngle, double turnPower) {
+		if (firstTimeAuton == true) {
+			firstTimeAuton = false;
+			autonCrossTime = System.currentTimeMillis();
+		}
+				
+		if ((System.currentTimeMillis() - autonCrossTime) <= ((autonCrossDistance / inchPerSecond) * 1000) + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
+			autonTurnDone = false;
+			adaptiveDrive(1.0 * autonSpeed, 1.0 * autonSpeed);
+		} else {
+			if (autonTurnDone == false) {
+				autonTurn(turnAngle, turnPower);
+			} else {
+				
+			}
+		}
+	}
+	
+	@Override
+	public void autonomousInit() {
+		gameData = DriverStation.getInstance().getGameSpecificMessage();
+		
+		if (gameData.length() > 0) {
+			if (gameData.charAt(0) == 'L') {
+				switchSide = "left";
+			} else {
+				switchSide = "right";
+			}
+		} else {
+			switchSide = null;
+		}
+		
+		autonCrossDistance = SmartDashboard.getNumber("Auton Cross Distance", 119.0);
+		autonSpeed = SmartDashboard.getNumber("Auton Speed", 0.65);
+		inchPerSecond = SmartDashboard.getNumber("Inch Per Second",38.0);
+		autonMode = SmartDashboard.getString("Auton Mode","cross");
+		System.out.println(autonMode.equals("cross"));
+		
+		firstTimeAuton = true;
+		ahrs.zeroYaw();
+		encLeft.reset();
+		encRight.reset();
+	}
+	
+	@Override
+	public void autonomousPeriodic() {
+		updateEncoders();
+		
+		if (autonMode.equals("cross")) {
+			autonCross();
+		} else if (autonMode.equals("place")) {
+			autonPlace(40.0, 0.35); // We need to find the correct turning angle and power. Also change based on the options given.
+		} else { // Invalid Mode
+			System.out.println("Invalid Mode");
+			adaptiveDrive(0, 0);
+		}
 	}
 	
 	@Override
 	public void teleopInit() {
+		gameData = DriverStation.getInstance().getGameSpecificMessage();
+		
+		if (gameData.length() > 0) {
+			if (gameData.charAt(0) == 'L') {
+				switchSide = "left";
+			} else {
+				switchSide = "right";
+			}
+		} else {
+			switchSide = null;
+		}
+		
 		SmartDashboard.putNumber("filterContoursMinArea", 200.0);
 		ahrs.zeroYaw();
 	}
 
 	@Override
 	public void teleopPeriodic() {
+		updateEncoders();
+		
 		double scale = getDrivePowerScale();
 		
 		if (controllerMode == 1) {

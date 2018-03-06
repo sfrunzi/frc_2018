@@ -13,7 +13,6 @@ import com.kauailabs.navx.frc.AHRS;
 
 import edu.wpi.first.wpilibj.Compressor;
 import edu.wpi.first.wpilibj.DoubleSolenoid;
-
 import edu.wpi.cscore.CvSource;
 import edu.wpi.cscore.UsbCamera;
 import edu.wpi.first.wpilibj.CameraServer;
@@ -23,16 +22,22 @@ import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.SPI;
+import edu.wpi.first.wpilibj.Talon;
 import edu.wpi.first.wpilibj.Ultrasonic;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.vision.VisionThread;
-import edu.wpi.first.wpilibj.networktables.NetworkTable;
 
-@SuppressWarnings("deprecation")
+// PWM ID 0 -- two front motors with compliant wheels
+// PWM ID 1 -- two rear motors with four compliant wheel shafts
+// PWM ID 2 -- two intake motors
+// CAN ID 9 -- front intake bar
 public class Robot extends IterativeRobot {
-	//UsbCamera intakeCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.1:1.0-video-index0");
-	//CvSource intakeOutputStream;
-	//VisionThread intakeVisionThread;
+	UsbCamera intakeCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.1:1.0-video-index0");
+	CvSource intakeOutputStream;
+	VisionThread intakeVisionThread;
+	
+	UsbCamera backCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.2:1.0-video-index0");
 	
 	int contourNumber = 0;
 	
@@ -59,8 +64,7 @@ public class Robot extends IterativeRobot {
 	//Test Variables
 	String switchSide = "left";
 	int robotPosition = 1;
-	
-	String autonMode;
+
 	String autonSwitchPlace = "forward";
 	double autonCrossDistance;
 	
@@ -86,6 +90,8 @@ public class Robot extends IterativeRobot {
 	
 	double autonSpeed;
 	
+	String autonStep;
+	
 	AHRS ahrs;
 	
 	TalonSRX frontLeft = new TalonSRX(1);
@@ -96,23 +102,28 @@ public class Robot extends IterativeRobot {
     TalonSRX middleRight = new TalonSRX(5);
     TalonSRX rearRight = new TalonSRX(6);
     
-    TalonSRX intakeLeft;
-    TalonSRX intakeRight;
-    TalonSRX rampLeft;
-    TalonSRX rampRight;
-    TalonSRX climberTop;
-    TalonSRX climberBottom;
+    Talon intake;
+    Talon upperRamp;
+    Talon lowerRamp;
+    
+    TalonSRX beatingStick;
+    
+    //TalonSRX climberTop;
+    //TalonSRX climberBottom;
     
     //Ultrasonic leftUltrasonic = new Ultrasonic(1,1);
     //Ultrasonic rightUltrasonic = new Ultrasonic(2,2);
     
-    //DoubleSolenoid driveTrainShift = new DoubleSolenoid(0, 0, 1);
-    //Compressor compressor = new Compressor(0);
+    DoubleSolenoid driveTrainShift = new DoubleSolenoid(0, 0, 1);
+    DoubleSolenoid ptoShift = new DoubleSolenoid(0, 4, 5);
+    Compressor compressor = new Compressor(0);
+    
+    DoubleSolenoid intakePiston = new DoubleSolenoid(0, 2, 3);
+    
+    boolean autonTurn1Done = false;
     
     Encoder encLeft;
 	Encoder encRight;
-	
-	NetworkTable table;
 	
 	int countR;
 	double rawDistanceR;
@@ -132,9 +143,18 @@ public class Robot extends IterativeRobot {
     
     int controllerMode = 1; // 1 is normal, 2 is experimental Attack 3 mode, and 3 is Joystick normal
     
+    double[] lowerRampSpeeds = {0.65, 0.75};
+    double[] upperRampSpeeds = {0.65};
+    
+    int lowerRampSpeed = 0;
+    int upperRampSpeed = 0;
+    
 	private Joystick leftStick;
 	private Joystick rightStick;
 	Joystick operatorStick;
+	
+	SendableChooser<Integer> autonChoose;
+	int autonMode;
 	
 	public boolean nearZero(double in) {
 		if (in >= -0.01 && in <= 0.01) {
@@ -165,23 +185,13 @@ public class Robot extends IterativeRobot {
 	
 	public double getDrivePowerScale() {
 		double scale = 1;
-
-		if (controllerMode == 1 || controllerMode == 2) {
-			if ( leftStick.getTrigger() || rightStick.getTrigger() ) {
-				scale = 0.85;
-			}
-			
-			if (leftStick.getTrigger() && rightStick.getTrigger()) {
-				scale = 1;
-			}
-		} else {
-			if (operatorStick.getRawButton(5) || operatorStick.getRawButton(6)) {
-				scale = 0.85;
-			}
-			
-			if (operatorStick.getRawButton(5) && operatorStick.getRawButton(6)) {
-				scale = 1;
-			}
+		
+		if ( leftStick.getTrigger() || rightStick.getTrigger() ) {
+			scale = 0.85;
+		}
+		
+		if (leftStick.getTrigger() && rightStick.getTrigger()) {
+			scale = 1;
 		}
 		
 		return scale;
@@ -237,8 +247,6 @@ public class Robot extends IterativeRobot {
 
 	@Override
 	public void robotInit() {
-		table = NetworkTable.getTable("SmartDashboard");
-
 	    rearLeft.setInverted(true);
 
 		middleRight.setInverted(true);
@@ -266,16 +274,26 @@ public class Robot extends IterativeRobot {
 		SmartDashboard.putString("hsvThresholdSaturation", "[15.0, 255.0]");
 		SmartDashboard.putString("hsvThresholdValue", "[0.0, 255.0]");
 		SmartDashboard.putString("filterContoursSolidity", "[0, 100]");
+
+		autonChoose = new SendableChooser<Integer>();
 		
-		/*intakeLeft = new TalonSRX(4);
-	    intakeRight  = new TalonSRX(5);
-	    rampLeft = new TalonSRX(6);
-	    rampRight = new TalonSRX(7);
-	    climberTop = new TalonSRX(8);
-	    climberBottom = new TalonSRX(9);*/
+		autonChoose.addDefault("cross", 1);
+		autonChoose.addObject("place", 2);
+		autonChoose.addObject("exchange", 3);
+		
+		SmartDashboard.putData("Auton Mode", autonChoose);
+		
+		intake = new Talon(0);
+	    lowerRamp = new Talon(1);
+	    upperRamp = new Talon(2);
+	    beatingStick = new TalonSRX(9);
+	    beatingStick.setInverted(true);
+	    
+	    //climberTop = new TalonSRX(8);
+	    //climberBottom = new TalonSRX(9);
 		
 		//intakeCamera.setResolution(320, 240);
-		//intakeCamera.setFPS(5);
+		//backCamera.setResolution(320, 240);
 		
 		//intakeOutputStream = CameraServer.getInstance().putVideo("intakeOverlay", 320, 240);
 		//intakeOutputStream.setFPS(5);
@@ -380,6 +398,14 @@ public class Robot extends IterativeRobot {
 	
 	// Auton helpers
 	
+	public void autonPlaceCube() {
+		
+	}
+	
+	public void autonPickupCube() {
+		
+	}
+	
 	public void autonForward(double distance) {
 		if (firstTimeAuton == true) {
 			firstTimeAuton = false;
@@ -403,6 +429,36 @@ public class Robot extends IterativeRobot {
 		}
 		
 		if ((System.currentTimeMillis() - autonCrossTime) <= ((distance / inchPerSecond) * 1000) + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
+			adaptiveDrive(-1.0 * autonSpeed, -1.0 * autonSpeed);
+		} else {
+			adaptiveDrive(0, 0);
+			autonReverseDone = true;
+		}
+	}
+	
+	public void autonForward_Time(double time) {
+		if (firstTimeAuton == true) {
+			firstTimeAuton = false;
+			autonCrossTime = System.currentTimeMillis();
+			autonForwardDone = false;
+		}
+		
+		if ((System.currentTimeMillis() - autonCrossTime) <= time + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
+			adaptiveDrive(1.0 * autonSpeed, 1.0 * autonSpeed);
+		} else {
+			adaptiveDrive(0, 0);
+			autonForwardDone = true;
+		}
+	}
+	
+	public void autonReverse_Time(double time) {
+		if (firstTimeAuton == true) {
+			firstTimeAuton = false;
+			autonCrossTime = System.currentTimeMillis();
+			autonReverseDone = false;
+		}
+		
+		if ((System.currentTimeMillis() - autonCrossTime) <= time + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
 			adaptiveDrive(-1.0 * autonSpeed, -1.0 * autonSpeed);
 		} else {
 			adaptiveDrive(0, 0);
@@ -439,9 +495,13 @@ public class Robot extends IterativeRobot {
 		if (!autonCrossDone) {
 			autonCross();
 		} else {
-			if (autonTurnDone == false) {
+			if (!autonTurn1Done) {
 				firstTimeAuton = true;
 				autonTurn(turnAngle);
+				
+				if (autonTurnDone) {
+					autonTurn1Done = true;
+				}
 			} else {
 				setDriveMotors(0.0, 0.0);
 			}
@@ -453,10 +513,10 @@ public class Robot extends IterativeRobot {
 			autonCrossDone = false;
 		}
 		
-		if (!autonCrossDone) {
+		if (!autonForwardDone) {
 			autonForward(autonCrossDistance);
 		} else {
-			autonCrossDone = false;
+			autonCrossDone = true;
 		}
 	}
 	
@@ -477,72 +537,91 @@ public class Robot extends IterativeRobot {
 		autonCrossDistance = SmartDashboard.getNumber("Auton Cross Distance", 119.0);
 		autonSpeed = SmartDashboard.getNumber("Auton Speed", 0.65);
 		inchPerSecond = SmartDashboard.getNumber("Inch Per Second", 53.0);
-		//autonMode = SmartDashboard.getString("Auton Mode" ,"cross");
-		autonMode = "cross";
 		
 		autonTurnDone = false;
-		
+		autonTurn1Done = false;
 		firstTimeAuton = true;
 
 		resetDistanceAndYaw();
+		
+		autonMode = autonChoose.getSelected();
+		
+		autonStep = "firstStraight";
 	}
 	
 	@Override
 	public void autonomousPeriodic() {
-		//driveTrainShift.set(DoubleSolenoid.Value.kOff);
+		driveTrainShift.set(DoubleSolenoid.Value.kOff);
 		updateEncoders();
 		
-		if (autonMode.equals("cross")) {
-			autonCross();
-		} else if (autonMode.equals("place")) {
-			autonPlace(90.0); // We need to find the correct turning angle. Also change based on the options given.
-		} else if (autonMode.equals("exchange")) {
-			autonExchange();
-		} else { // Invalid Mode
-			System.out.println("Invalid Mode");
-			adaptiveDrive(0, 0);
+		switch (autonMode) {
+			case 1: // Cross
+				autonCross();
+				break;
+			case 2: // Side
+				switch (switchSide) {
+					case "front":
+						break;
+					case "side":
+						break;
+					case "back":
+						switch (autonStep) {
+							case "firstStraight":
+								if (robotPosition == 1 || robotPosition == 3) {
+									autonForward(12); // What distance?
+									autonStep = "firstAutonTurn90";
+								} else if (robotPosition == 2 || robotPosition == 4) {
+									autonForward(12); // What distance?
+									autonStep = "firstAutonTurnNegative90";
+								}
+								break;
+							case "firstAutonTurn90":
+								autonTurn(90);
+								break;
+							case "firstAutonTurnNegative90":
+								autonTurn(-90);
+								break;
+							
+						}
+						break;
+				}
+				break;
+			case 3: // Switch
+				break;
+			default:
+				System.out.println("Invalid Mode");
+				adaptiveDrive(0, 0);
+				break;
 		}
 	}
 	
-	@Override
-	public void teleopInit() {
-		gameData = DriverStation.getInstance().getGameSpecificMessage();
-		
-		if (gameData.length() > 0) {
-			if (gameData.charAt(0) == 'L') {
-				switchSide = "left";
-			} else {
-				switchSide = "right";
-			}
-		} else {
-			switchSide = null;
-		}
-		
-		SmartDashboard.putNumber("filterContoursMinArea", 200.0);
-		
-		resetDistanceAndYaw();
+	public void teleopUpdateDashboard() {
+		SmartDashboard.putNumber("Target Distance:", targetDistance);
+		SmartDashboard.putNumber("Aspect Ratio:", aspectRatio);
+		SmartDashboard.putNumber("Countour Number:", contourNumber);
+		SmartDashboard.putNumber("Running:", pipelineRunning);
+		SmartDashboard.putBoolean("Target Found:", foundTarget);
 	}
-
-	@Override
-	public void teleopPeriodic() {
-		updateEncoders();
-		
+	
+	public void driverController() {
 		double scale = getDrivePowerScale();
 		
-		if (leftStick.getTrigger()) {
-			//driveTrainShift.set(DoubleSolenoid.Value.kForward);
+		if (leftStick.getRawButton(1)) { //fixZ
+			driveTrainShift.set(DoubleSolenoid.Value.kForward);
+			ptoShift.set(DoubleSolenoid.Value.kForward);
 		}
 		else if (rightStick.getTrigger()) {
-			//driveTrainShift.set(DoubleSolenoid.Value.kReverse);
+			driveTrainShift.set(DoubleSolenoid.Value.kReverse);
+			ptoShift.set(DoubleSolenoid.Value.kReverse);
 		}
 		else {
-			//driveTrainShift.set(DoubleSolenoid.Value.kOff);
+			driveTrainShift.set(DoubleSolenoid.Value.kOff);
+			ptoShift.set(DoubleSolenoid.Value.kOff);
 		}
 		
 		if (controllerMode == 1) {
 			adaptiveDrive(scale * (-1 * leftStick.getY()), scale * (-1 * rightStick.getY())); //  Negated
 		} else if (controllerMode == 2) {
-			
 			if (!nearZero(leftStick.getY()) && nearZero(rightStick.getX())) {
 				adaptiveDrive(scale * leftStick.getY(), scale * leftStick.getY());
 			} else if (nearZero(leftStick.getY()) && !nearZero(rightStick.getX())) {
@@ -564,12 +643,108 @@ public class Robot extends IterativeRobot {
 		} else if (controllerMode == 3) {
 			adaptiveDrive(scale * (-1 * operatorStick.getRawAxis(1)), scale * (-1 * operatorStick.getRawAxis(5)));
 		}
-		
-		SmartDashboard.putNumber("Target Distance:", targetDistance);
-		SmartDashboard.putNumber("Aspect Ratio:", aspectRatio);
-		SmartDashboard.putNumber("Countour Number:", contourNumber);
-		SmartDashboard.putNumber("Running:", pipelineRunning);
-		SmartDashboard.putBoolean("Target Found:", foundTarget);
+	}
 	
+	public void intakeRoller(boolean in, boolean out) {
+		if (in) {
+			intake.set(0.65);
+			//lowerIntake.set(0.65);
+			beatingStick.set(ControlMode.PercentOutput, 0.65);
+		} else if (out) {
+			intake.set(-0.65);
+			//lowerIntake.set(-0.65);
+			beatingStick.set(ControlMode.PercentOutput, -0.65);
+		} else {
+			intake.set(0);
+			//lowerIntake.set(0);
+			beatingStick.set(ControlMode.PercentOutput, 0);
+		}
+	}
+	
+	public void intakePiston(boolean toogle) {
+		/*if (in == true) {
+			intakePiston.set(DoubleSolenoid.Value.kForward);
+		} else if (out == true) {
+			intakePiston.set(DoubleSolenoid.Value.kReverse);
+		} else {
+			intakePiston.set(DoubleSolenoid.Value.kOff);
+		}*/
+	}
+	
+	public void outakeLowerRamp(boolean run) {
+/*
+		if (run >= 0.5) {
+			lowerRamp.set(lowerRampSpeeds[lowerRampSpeed]);
+		} else if (run <= -0.5) {
+			lowerRamp.set(-lowerRampSpeeds[lowerRampSpeed]);
+		} else {
+			lowerRamp.set(0);
+		}
+*/
+		if (run) {
+			lowerRamp.set(-1.0);
+		}
+		else {
+			lowerRamp.set(0.0);
+		}
+	}
+	
+	public void outakeUpperRamp(boolean run) {
+		if (run) {
+//			upperRamp.set(upperRampSpeeds[upperRampSpeed]);
+			upperRamp.set(1.0);
+		} else {
+			upperRamp.set(0.0);
+		}
+	}
+	 
+	public void operaterController() {
+		intakeRoller(operatorStick.getRawButton(5), operatorStick.getRawButton(6));
+		intakePiston(operatorStick.getRawButtonReleased(3)); // a open/close toggle (3)
+		outakeLowerRamp(operatorStick.getRawButton(4)); // left up and down w/ speed
+		outakeUpperRamp(operatorStick.getRawButton(2)); // right up and down w/ speed
+		
+		/*
+			if (operatorStick.getRawButtonPressed(3)) { // left toggle speed options
+				lowerRampSpeed += 1;
+				if (lowerRampSpeed >= lowerRampSpeeds.length) {
+					lowerRampSpeed = 0;
+				}
+			}
+			
+			if (operatorStick.getRawButtonPressed(2)) { // right toggle speed options
+				upperRampSpeed += 1;
+				if (upperRampSpeed >= upperRampSpeeds.length) {
+					upperRampSpeed = 0;
+				}
+			}
+		*/
+	}
+	
+	@Override
+	public void teleopInit() {
+		gameData = DriverStation.getInstance().getGameSpecificMessage();
+		
+		if (gameData.length() > 0) {
+			if (gameData.charAt(0) == 'L') {
+				switchSide = "left";
+			} else {
+				switchSide = "right";
+			}
+		} else {
+			switchSide = null;
+		}
+		
+		SmartDashboard.putNumber("filterContoursMinArea", 200.0);
+		
+		resetDistanceAndYaw();
+	}
+	
+	@Override
+	public void teleopPeriodic() {
+		updateEncoders();
+		driverController();
+		operaterController();
+		teleopUpdateDashboard();
 	}
 }

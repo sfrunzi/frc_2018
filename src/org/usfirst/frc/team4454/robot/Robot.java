@@ -29,7 +29,7 @@ import edu.wpi.first.wpilibj.vision.VisionThread;
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 
 @SuppressWarnings("deprecation")
-public class Robot extends IterativeRobot {
+public class Robot extends IterativeRobot implements RobotInterface {
 	//UsbCamera intakeCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.1:1.0-video-index0");
 	//CvSource intakeOutputStream;
 	//VisionThread intakeVisionThread;
@@ -135,6 +135,20 @@ public class Robot extends IterativeRobot {
 	private Joystick leftStick;
 	private Joystick rightStick;
 	Joystick operatorStick;
+	
+	private auton rr;
+	
+	public Robot() 
+	{
+		//we pass a reference to ourselves
+		rr = new auton( this );
+	}
+	
+	public void Run() {
+		//run the loop which has the logic to tell us what to do
+		//e.g. we are the controlled and robotrunnable is the controller
+		rr.Run();
+	}
 	
 	public boolean nearZero(double in) {
 		if (in >= -0.01 && in <= 0.01) {
@@ -378,88 +392,6 @@ public class Robot extends IterativeRobot {
 		encRight.setSamplesToAverage(7);
 	}
 	
-	// Auton helpers
-	
-	public void autonForward(double distance) {
-		if (firstTimeAuton == true) {
-			firstTimeAuton = false;
-			autonCrossTime = System.currentTimeMillis();
-			autonForwardDone = false;
-		}
-		
-		if ((System.currentTimeMillis() - autonCrossTime) <= ((distance / inchPerSecond) * 1000) + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
-			adaptiveDrive(1.0 * autonSpeed, 1.0 * autonSpeed);
-		} else {
-			adaptiveDrive(0, 0);
-			autonForwardDone = true;
-		}
-	}
-	
-	public void autonReverse(double distance) {
-		if (firstTimeAuton == true) {
-			firstTimeAuton = false;
-			autonCrossTime = System.currentTimeMillis();
-			autonReverseDone = false;
-		}
-		
-		if ((System.currentTimeMillis() - autonCrossTime) <= ((distance / inchPerSecond) * 1000) + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
-			adaptiveDrive(-1.0 * autonSpeed, -1.0 * autonSpeed);
-		} else {
-			adaptiveDrive(0, 0);
-			autonReverseDone = true;
-		}
-	}
-	
-	public void autonTurn(double turnAngle) {
-		double temp = Math.signum(turnAngle) * autonSpeed;
-		setDriveMotors(temp, -temp);
-		if ((turnAngle == 0.0) || (Math.abs(ahrs.getAngle()) > Math.abs(turnAngle))) {
-			autonTurnDone = true;
-			setDriveMotors(0.0, 0.0);
-			resetDistanceAndYaw();
-		}
-	}
-	
-	// Auton Modes
-	
-	public void autonExchange() {
-		if (!autonCrossDone) {
-			autonCross();
-		} else {
-			if (!autonReverseDone) {
-				firstTimeAuton = true;
-				autonReverse(86.0);
-			} else {
-				
-			}
-		}
-	}
-	
-	public void autonPlace(double turnAngle) {
-		if (!autonCrossDone) {
-			autonCross();
-		} else {
-			if (autonTurnDone == false) {
-				firstTimeAuton = true;
-				autonTurn(turnAngle);
-			} else {
-				setDriveMotors(0.0, 0.0);
-			}
-		}
-	}
-	
-	public void autonCross() {
-		if (firstTimeAuton == true) {
-			autonCrossDone = false;
-		}
-		
-		if (!autonCrossDone) {
-			autonForward(autonCrossDistance);
-		} else {
-			autonCrossDone = false;
-		}
-	}
-	
 	@Override
 	public void autonomousInit() {
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
@@ -473,35 +405,13 @@ public class Robot extends IterativeRobot {
 		} else {
 			switchSide = null;
 		}
-		
-		autonCrossDistance = SmartDashboard.getNumber("Auton Cross Distance", 119.0);
-		autonSpeed = SmartDashboard.getNumber("Auton Speed", 0.65);
-		inchPerSecond = SmartDashboard.getNumber("Inch Per Second", 53.0);
-		//autonMode = SmartDashboard.getString("Auton Mode" ,"cross");
-		autonMode = "cross";
-		
-		autonTurnDone = false;
-		
-		firstTimeAuton = true;
 
 		resetDistanceAndYaw();
 	}
 	
 	@Override
 	public void autonomousPeriodic() {
-		//driveTrainShift.set(DoubleSolenoid.Value.kOff);
-		updateEncoders();
-		
-		if (autonMode.equals("cross")) {
-			autonCross();
-		} else if (autonMode.equals("place")) {
-			autonPlace(90.0); // We need to find the correct turning angle. Also change based on the options given.
-		} else if (autonMode.equals("exchange")) {
-			autonExchange();
-		} else { // Invalid Mode
-			System.out.println("Invalid Mode");
-			adaptiveDrive(0, 0);
-		}
+		Run();
 	}
 	
 	@Override

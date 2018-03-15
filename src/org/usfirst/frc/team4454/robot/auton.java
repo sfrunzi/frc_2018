@@ -16,61 +16,142 @@ public class auton {
 		String autonStep = "firstForward";
 		String switchSide = "front";
 		String cubePlacement = "right";
+		boolean startStep = true;
 		int robotPosition = 2;
 		int autonMode = 2;
+		//robot.autonPlaceCubeStart = true; is needed
 		switch (autonMode) {
 				case 1: // Cross
-					// Find correct cross length and end after done.
-					robot.autonForward(30);
+					// Find correct cross length and end after done. Also flip it because it is going backwards
+					if (!robot.autonForward_Done()) {
+						robot.autonForward(121.56, true);
+					} else {
+						autonStep = "end";
+					}
 					break;
 				case 2: // Place
 					switch (switchSide) {
 						case "front":
+							if (startStep) {
+								robot.firstTimeAuton(true);
+								startStep = false;
+							}
+							
 							switch(autonStep) {
 							case "firstForward":
-								robot.autonForward(81.5);
-								autonStep = "firstTurn";
+								if (((robotPosition == 1 || robotPosition == 3 || robotPosition == 4) && cubePlacement == "left") || ((robotPosition == 4)  && cubePlacement == "right")) {
+									if (!robot.autonForward_Done()) {
+										robot.autonForward(81, true);
+									} else {
+										autonStep = "firstTurn";
+										startStep = true;
+									}
+								} else if ((robotPosition == 2 && cubePlacement == "left") || ((robotPosition == 1) && cubePlacement == "right")) {
+									if (!robot.autonForward_Done()) {
+										robot.autonForward(55, true);
+									} else {
+										autonStep = "firstTurn";
+										startStep = true;
+									}
+								} else if (robotPosition == 3 && cubePlacement == "right") {
+									if (!robot.autonForward_Done()) {
+										robot.autonForward(98, true);
+									} else {
+										autonStep = "place";
+										startStep = true;
+									}
+								} else if (robotPosition == 3 && cubePlacement == "right") {
+									if (!robot.autonForward_Done()) {
+										robot.autonForward(48, true);
+									} else {
+										autonStep = "firstTurn";
+										startStep = true;
+									}
+								}
 								break;
 							case "firstTurn":
-								if (((robotPosition == 2 || robotPosition == 3 || robotPosition == 4) && cubePlacement == "left") || ((robotPosition == 3 || robotPosition == 4)  && cubePlacement == "right")) {
-									robot.autonTurn(-90);
-								} else if ((robotPosition == 1 && cubePlacement == "left") || ((robotPosition == 1 || robotPosition == 2) && cubePlacement == "right")) {
-									robot.autonTurn(90);
+								if (!robot.autonTurn_Done()) {
+									if (((robotPosition == 2 || robotPosition == 3 || robotPosition == 4) && cubePlacement == "left") || ((robotPosition == 4)  && cubePlacement == "right")) {
+										robot.autonTurn(-90, true);
+									} else if ((robotPosition == 1  && cubePlacement == "left") || ((robotPosition == 1 || robotPosition == 2) && cubePlacement == "right")) {
+										robot.autonTurn(90, true);
+									}
+								} else {
+									autonStep = "secondForward";
+									startStep = true;
 								}
-								
-								autonStep = "secondForward";
 								break;
 							case "secondForward":
-								System.out.println("forward");
-								
-								autonStep = "secondTurn";
+								if (!robot.autonForward_Done()) {
+									if (((robotPosition == 1) && cubePlacement == "left")) {
+										robot.autonForward(82, true);
+									} else if ((robotPosition == 2 && cubePlacement == "left")) {
+										robot.autonForward(51, true);
+									} else if ((robotPosition == 3 && cubePlacement == "left")) {
+										robot.autonForward(106, true);
+									} else if ((robotPosition == 4 && cubePlacement == "left")) {
+										robot.autonForward(167, true);
+									} else if ((robotPosition == 1 && cubePlacement == "right")) {
+										robot.autonForward(201, true);
+									} else if ((robotPosition == 2 && cubePlacement == "right")) {
+										robot.autonForward(64, true);
+									} else if ((robotPosition == 4 && cubePlacement == "right")) {
+										robot.autonForward(80, true);
+									}
+								} else {
+									autonStep = "secondTurn";
+									startStep = true;
+								}
 								break;
 							case "secondTurn":
-								if (((robotPosition == 2 || robotPosition == 3 || robotPosition == 4) && cubePlacement == "left") || ((robotPosition == 3 || robotPosition == 4) && cubePlacement == "right")) {
-									robot.autonTurn(-90);
-								} else if ((robotPosition == 1 && cubePlacement == "left") || ((robotPosition == 1 || robotPosition == 2) && cubePlacement == "right")) {
-									robot.autonTurn(90);
+								if (!robot.autonTurn_Done()) {
+									if (((robotPosition == 2 || robotPosition == 3 || robotPosition == 4) && cubePlacement == "left") || ((robotPosition == 4) && cubePlacement == "right")) {
+										robot.autonTurn(90, true);
+									} else if ((robotPosition == 1 && cubePlacement == "left") || ((robotPosition == 1 || robotPosition == 2) && cubePlacement == "right")) {
+										robot.autonTurn(-90, true);
+									}
+								} else {
+									autonStep = "thirdForward";
+									startStep = true;
 								}
-								
-								autonStep = "thirdForward";
 								break;
 							case "thirdForward":
-								System.out.println("forward");
-								autonStep = "place";
+								if (!robot.autonForward_Done()) {
+									if (((robotPosition == 1 || robotPosition == 3 || robotPosition == 4) && cubePlacement == "left") || ((robotPosition == 4)  && cubePlacement == "right")) {
+										robot.autonForward(17, true);
+									} else if ((robotPosition == 2 && cubePlacement == "left") || (robotPosition == 1 && cubePlacement == "right")) {
+										robot.autonForward(43, true);
+									} else if ((robotPosition == 2 && cubePlacement == "right")) {
+										robot.autonForward(50, true);
+									}
+								} else {
+									autonStep = "place";
+									startStep = true;
+								}
+								
 								break;
 							case "place":
-								System.out.println("place");
-								autonStep = "end";
+								if (!robot.autonPlaceCube_Done()) {
+									robot.autonPlaceCube(5); // todo: correct time
+								} else {
+									autonStep = "end";
+									startStep = true;
+								}
 								break;
 							case "end":
 								break;
 							}
 							break;
-						case "side": // left
+						case "side": // WIP
 							switch (autonStep) {
 								case "firstForward":
-									System.out.println("forward");
-									autonStep = "firstTurn";
+									if (((robotPosition == 1) && cubePlacement == "left") || ((robotPosition == 4)  && cubePlacement == "right")) {
+										robot.autonForward(138, true);
+										autonStep = "firstTurn";
+									} else if ((robotPosition == 2 || robotPosition == 3 || robotPosition == 4 && cubePlacement == "left") || ((robotPosition == 1 || robotPosition == 2 || robotPosition == 3) && cubePlacement == "right")) {
+										robot.autonForward(81, true);
+										autonStep = "firstTurn";
+									}
 									break;
 								case "firstTurn":
 									if (((robotPosition == 1 || robotPosition == 2) && cubePlacement == "left") || ((robotPosition == 4 || robotPosition == 1)  && cubePlacement == "right")) {
@@ -111,45 +192,7 @@ public class auton {
 									autonStep = "place";
 									break;
 								case "place":
-									System.out.println("place");
 									autonStep = "end";
-									break;
-								case "end":
-									break;
-							}
-							break;
-						case "back":
-							switch (autonStep) {
-								case "firstForward":
-									System.out.println("forward");
-									if (((robotPosition == 1 || robotPosition == 3 || robotPosition == 4) && (cubePlacement == "left")) || ((robotPosition == 3 || robotPosition == 4) && (cubePlacement == "right"))) {
-										autonStep = "secondForward";
-									} else if (((robotPosition == 2) && (cubePlacement == "left")) || ((robotPosition == 1 || robotPosition == 2) && (cubePlacement == "right"))) {
-										autonStep = "firstTurn";
-									}
-									break;
-								case "firstTurn":
-									if (((robotPosition == 1) && (cubePlacement == "left")) || ((robotPosition == 1 || robotPosition == 2) && (cubePlacement == "right"))) {
-										System.out.println("turn 90 degrees");
-									} else if (((robotPosition == 3 || robotPosition == 4) && (cubePlacement =="left")) || ((robotPosition == 3 || robotPosition == 4) && (cubePlacement == "right"))) {
-										System.out.println("turn -90 degrees");
-									}
-									autonStep = "secondForward";
-									break;
-								case "secondForward":
-									System.out.println("forward");
-									autonStep = "secondTurn";
-									break;
-								case "secondTurn":
-									if ((robotPosition == 3 || robotPosition == 4) && (cubePlacement == "left")) {
-										System.out.println("turn -90 degrees");
-									} else if ((robotPosition == 1) && (cubePlacement == "left")) {
-										System.out.println("turn 90 degrees");
-									}
-									autonStep = "place";
-									break;
-								case "place":
-									System.out.println("place");
 									break;
 								case "end":
 									break;

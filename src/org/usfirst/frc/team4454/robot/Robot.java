@@ -17,6 +17,7 @@ import edu.wpi.cscore.CvSource;
 import edu.wpi.cscore.UsbCamera;
 import edu.wpi.first.wpilibj.CameraServer;
 import edu.wpi.first.wpilibj.CounterBase;
+import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.IterativeRobot;
@@ -36,6 +37,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	UsbCamera intakeCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.1:1.0-video-index0");
 	CvSource intakeOutputStream;
 	VisionThread intakeVisionThread;
+	DigitalInput beamBreak;
 	
 	UsbCamera backCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.2:1.0-video-index0");
 	
@@ -92,6 +94,10 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	
 	double autonSpeed;
 	
+	boolean autonPlaceCubeStart;
+	boolean autonPlaceCubeDone;
+	double autonPlaceCubeTime;
+	
 	String autonStep;
 	
 	AHRS ahrs;
@@ -109,7 +115,6 @@ public class Robot extends IterativeRobot implements RobotInterface {
     Talon lowerRamp;
     
     TalonSRX beatingStick;
-    TalonSRX climberRuler;
     //TalonSRX climberBottom;
     
     //Ultrasonic leftUltrasonic = new Ultrasonic(1,1);
@@ -303,7 +308,6 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	    upperRamp = new Talon(1);
 	    beatingStick = new TalonSRX(9);
 	    beatingStick.setInverted(true);
-	    climberRuler = new TalonSRX(8);
 	    
 	    //climberTop = new TalonSRX(8);
 	    //climberBottom = new TalonSRX(9);
@@ -317,6 +321,8 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		leftStick = new Joystick(0);
 		rightStick = new Joystick(1);
 		operatorStick = new Joystick(2);
+		
+		beamBreak = new DigitalInput(1); // todo: Real id
 		
 		try {
 			/***********************************************************************
@@ -413,27 +419,61 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	}
 	
 	// Auton helpers
-	
 	@Override
-	public void autonPlaceCube() {
-		
+	public boolean autonPlaceCube_Done() {
+		return autonPlaceCubeDone;
 	}
 	
 	@Override
-	public void autonPickupCube() {
-		
+	public boolean autonForward_Done() {
+		return autonForwardDone;
 	}
 	
 	@Override
-	public void autonForward(double distance) {
-		if (firstTimeAuton == true) {
+	public boolean autonReverse_Done() {
+		return autonReverseDone;
+	}
+	
+	@Override
+	public boolean autonTurn_Done() {
+		return autonTurnDone;
+	}
+	
+	@Override
+	public void firstTimeAuton(boolean set) {
+		firstTimeAuton = set;
+	}
+	
+	@Override
+	public void autonPlaceCube(double time) {
+		if (firstTimeAuton) {
+			autonPlaceCubeDone = false;
+			autonPlaceCubeTime = System.currentTimeMillis();
+			firstTimeAuton = false;
+		}
+		
+		if ((System.currentTimeMillis() - autonPlaceCubeTime) <= time) {
+			outakeUpperRamp(1);
+		} else {
+			outakeUpperRamp(1);
+			autonPlaceCubeDone = true;
+		}
+	}
+	
+	@Override
+	public void autonForward(double distance, boolean flip) {
+		if (firstTimeAuton) {
 			firstTimeAuton = false;
 			autonCrossTime = System.currentTimeMillis();
 			autonForwardDone = false;
 		}
 		
 		if ((System.currentTimeMillis() - autonCrossTime) <= ((distance / inchPerSecond) * 1000) + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
-			adaptiveDrive(1.0 * autonSpeed, 1.0 * autonSpeed);
+			if (!flip) {
+				adaptiveDrive(1.0 * autonSpeed, 1.0 * autonSpeed);
+			} else {
+				adaptiveDrive(-1.0 * autonSpeed, -1.0 * autonSpeed);
+			}
 		} else {
 			adaptiveDrive(0, 0);
 			autonForwardDone = true;
@@ -441,7 +481,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	}
 	
 	@Override
-	public void autonReverse(double distance) {
+	public void autonReverse(double distance, boolean flip) {
 		if (firstTimeAuton == true) {
 			firstTimeAuton = false;
 			autonCrossTime = System.currentTimeMillis();
@@ -449,7 +489,11 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		}
 		
 		if ((System.currentTimeMillis() - autonCrossTime) <= ((distance / inchPerSecond) * 1000) + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
-			adaptiveDrive(-1.0 * autonSpeed, -1.0 * autonSpeed);
+			if (!flip) {
+				adaptiveDrive(-1.0 * autonSpeed, -1.0 * autonSpeed);
+			} else {
+				adaptiveDrive(1.0 * autonSpeed, 1.0 * autonSpeed);
+			}
 		} else {
 			adaptiveDrive(0, 0);
 			autonReverseDone = true;
@@ -457,41 +501,13 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	}
 	
 	@Override
-	public void autonForward_Time(double time) {
-		if (firstTimeAuton == true) {
-			firstTimeAuton = false;
-			autonCrossTime = System.currentTimeMillis();
-			autonForwardDone = false;
-		}
-		
-		if ((System.currentTimeMillis() - autonCrossTime) <= time + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
-			adaptiveDrive(1.0 * autonSpeed, 1.0 * autonSpeed);
-		} else {
-			adaptiveDrive(0, 0);
-			autonForwardDone = true;
-		}
-	}
-	
-	@Override
-	public void autonReverse_Time(double time) {
-		if (firstTimeAuton == true) {
-			firstTimeAuton = false;
-			autonCrossTime = System.currentTimeMillis();
-			autonReverseDone = false;
-		}
-		
-		if ((System.currentTimeMillis() - autonCrossTime) <= time + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
-			adaptiveDrive(-1.0 * autonSpeed, -1.0 * autonSpeed);
-		} else {
-			adaptiveDrive(0, 0);
-			autonReverseDone = true;
-		}
-	}
-	
-	@Override
-	public void autonTurn(double turnAngle) {
+	public void autonTurn(double turnAngle, boolean flip) {
 		double temp = Math.signum(turnAngle) * autonSpeed;
-		setDriveMotors(temp, -temp);
+		if (!flip) {
+			setDriveMotors(temp, -temp);
+		} else {
+			setDriveMotors(-temp, temp);
+		}
 		if ((turnAngle == 0.0) || (Math.abs(ahrs.getAngle()) > Math.abs(turnAngle))) {
 			autonTurnDone = true;
 			setDriveMotors(0.0, 0.0);
@@ -544,6 +560,10 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		SmartDashboard.putBoolean("Target Found:", foundTarget);
 	}
 	
+	public boolean getBeamBreak(){
+		return beamBreak.get();
+	}
+	
 	public void driverController() {
 		double scale = getDrivePowerScale();
 		
@@ -558,18 +578,20 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		adaptiveDrive(scale * (-1 * leftStick.getY()), scale * (-1 * rightStick.getY()));
 	}
 	
-	public void climberRuler(boolean b) {
-		climberRuler.set(ControlMode.PercentOutput, 0.65);
-	}
-	
 	public void intakeRoller(double run) {
-		lowerRamp.set(run * 0.5);
-		intake.set(run);
-		if (run > 0.1) {
-			beatingStick.set(ControlMode.PercentOutput, -1);
-		} else if (run < -0.1) {
-			beatingStick.set(ControlMode.PercentOutput, 1);
+		if (!getBeamBreak()) {
+			lowerRamp.set(run * 0.5);
+			intake.set(run);
+			if (run > 0.1) {
+				beatingStick.set(ControlMode.PercentOutput, -1);
+			} else if (run < -0.1) {
+				beatingStick.set(ControlMode.PercentOutput, 1);
+			} else {
+				beatingStick.set(ControlMode.PercentOutput, 0);
+			}
 		} else {
+			lowerRamp.set(0);
+			intake.set(0);
 			beatingStick.set(ControlMode.PercentOutput, 0);
 		}
 	}
@@ -607,8 +629,6 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		intakePiston(operatorStick.getRawButtonReleased(1));
 		outakeUpperRamp(operatorStick.getRawAxis(5));
 		reverseOutake(operatorStick.getRawButton(2));
-		
-		climberRuler(operatorStick.getRawButton(4));
 	}
 	
 	@Override

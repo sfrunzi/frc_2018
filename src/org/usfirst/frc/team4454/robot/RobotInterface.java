@@ -1,11 +1,13 @@
 package org.usfirst.frc.team4454.robot;
 
 public interface RobotInterface {
-	public void autonPickupCube();
-	public void autonPlaceCube();
-	void autonTurn(double turnAngle);
-	void autonReverse_Time(double time);
-	void autonForward_Time(double time);
-	void autonReverse(double distance);
-	void autonForward(double distance);
+	boolean autonPlaceCube_Done();
+	boolean autonForward_Done();
+	boolean autonReverse_Done();
+	boolean autonTurn_Done();
+	void firstTimeAuton(boolean set);
+	void autonPlaceCube(double time);
+	void autonTurn(double turnAngle, boolean flip);
+	void autonReverse(double distance, boolean flip);
+	void autonForward(double distance, boolean flip);
 }

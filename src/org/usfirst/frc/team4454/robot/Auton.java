@@ -1,10 +1,10 @@
 package org.usfirst.frc.team4454.robot;
 
-public class auton {
+public class Auton {
 	//a reference to the parent class
 	private RobotInterface robot;
 	
-	public auton(Robot robot2) {
+	public Auton(Robot robot2) {
 		startStep = true;
 		firstRun = true;
 		autonHasWait = 0;

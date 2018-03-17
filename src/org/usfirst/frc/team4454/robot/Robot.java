@@ -178,13 +178,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	SendableChooser<String> autonAllianceChoose;
 	String autonAlliance;
 	
-	private auton rr;
-	
-	public Robot() 
-	{
-		//we pass a reference to ourselves
-		rr = new auton(this);
-	}
+	private Auton rr;
 	
 	public void runAuton() {
 		//run the loop which has the logic to tell us what to do
@@ -283,6 +277,8 @@ public class Robot extends IterativeRobot implements RobotInterface {
 
 	@Override
 	public void robotInit() {
+		rr = new Auton(this);
+		
 	    rearLeft.setInverted(true);
 
 		middleRight.setInverted(true);

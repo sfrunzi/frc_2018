@@ -542,9 +542,11 @@ public class Robot extends IterativeRobot implements RobotInterface {
 			firstTimeAuton = false;
 			autonCrossTime = System.currentTimeMillis();
 			autonForwardDone = false;
+			System.out.println("first run of forward");
 		}
 		
-		if ((System.currentTimeMillis() - autonCrossTime) <= ((distance / inchPerSecond) * 1000) + autonCrossWait && (System.currentTimeMillis() - autonCrossTime) >= autonCrossWait) {
+		if ((System.currentTimeMillis() - autonCrossTime) <= ((distance / inchPerSecond) * 1000)) {
+			System.out.println("moving forward");
 			if (!flip) {
 				adaptiveDrive(1.0 * autonSpeed, 1.0 * autonSpeed);
 			} else {
@@ -596,6 +598,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		rr = new Auton(this);
 		
 		intakePiston.set(DoubleSolenoid.Value.kForward);
+		ptoShift.set(DoubleSolenoid.Value.kReverse);
 		
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
 		
@@ -661,12 +664,12 @@ public class Robot extends IterativeRobot implements RobotInterface {
 			//low gear
 			highGear = false;
 			driveTrainShift.set(DoubleSolenoid.Value.kReverse);
-			ptoShift.set(DoubleSolenoid.Value.kReverse);
+			//ptoShift.set(DoubleSolenoid.Value.kReverse);
 		} else if (leftStick.getRawButton(2)) {
 			//high gear
 			highGear = true;
 			driveTrainShift.set(DoubleSolenoid.Value.kForward);
-			ptoShift.set(DoubleSolenoid.Value.kForward);
+			//ptoShift.set(DoubleSolenoid.Value.kForward);
 		}
 		
 		adaptiveDrive(scale * (-1 * leftStick.getY()), scale * (-1 * rightStick.getY()));
@@ -728,6 +731,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	@Override
 	public void teleopInit() {
 		intakePiston.set(DoubleSolenoid.Value.kForward);
+		ptoShift.set(DoubleSolenoid.Value.kReverse);
 		
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
 		

@@ -50,9 +50,11 @@ public class Auton {
 							if ((autonWait * 1000) <= (autonHasWait - System.currentTimeMillis())) {
 								startStep = true;
 								autonStep = "firstForward";
+								System.out.println("done wait");
 							}
 							break;
 						case "firstForward":
+							System.out.println("start step: " + startStep);
 							if (startStep) {
 								robot.firstTimeAuton(true);
 								startStep = false;
@@ -60,7 +62,8 @@ public class Auton {
 							}
 							
 							if (!robot.autonForward_Done()) {
-								robot.autonForward(121.5, true);
+								System.out.println("moving");
+								robot.autonForward(141.5, true);// 121.5
 							} else {
 								autonStep = "end";
 								System.out.println("ended");
@@ -69,6 +72,7 @@ public class Auton {
 						case "end":
 							break;
 					}
+					break;
 				case "place": // Place
 					switch (switchSide) {
 							

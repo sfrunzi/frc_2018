@@ -24,7 +24,6 @@ import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.Talon;
-import edu.wpi.first.wpilibj.Ultrasonic;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.vision.VisionThread;
@@ -32,14 +31,14 @@ import edu.wpi.first.wpilibj.vision.VisionThread;
 // PWM ID 0 -- two front motors with compliant wheels
 // PWM ID 1 -- two rear motors with four compliant wheel shafts
 // PWM ID 2 -- two intake motors
-// CAN ID 9 -- front intake bar
+// CAN ID 9 -- front intake bar 
 public class Robot extends IterativeRobot implements RobotInterface {
 	UsbCamera intakeCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.1:1.0-video-index0");
 	CvSource intakeOutputStream;
 	VisionThread intakeVisionThread;
 	DigitalInput beamBreak;
 	
-	UsbCamera backCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.2:1.0-video-index0");
+	//UsbCamera backCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.2:1.0-video-index0");
 	
 	int contourNumber = 0;
 	
@@ -65,7 +64,6 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	
 	//Test Variables
 	String switchSide = "left";
-	int robotPosition = 1;
 
 	String autonSwitchPlace = "forward";
 	double autonCrossDistance;
@@ -84,7 +82,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	boolean autonReverseDone = false;
 	boolean autonForwardDone = false;
 	
-	boolean intakePistonToggle = false;
+	boolean intakePistonToggle = true;
 	
 	double autonCrossTime;
 	double autonCrossWait = 3000;
@@ -97,6 +95,9 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	boolean autonPlaceCubeStart;
 	boolean autonPlaceCubeDone;
 	double autonPlaceCubeTime;
+	
+	boolean startStep = true;
+	
 	
 	String autonStep;
 	
@@ -159,15 +160,30 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	private Joystick rightStick;
 	Joystick operatorStick;
 	
-	SendableChooser<Integer> autonChoose;
-	int autonMode;
+	SendableChooser<Double> autonWaitChoose;
+	double autonWait;
+	
+	SendableChooser<String> autonChooseLeft;
+	String autonModeLeft;
+	
+	SendableChooser<String> autonChooseRight;
+	String autonModeRight;
+	
+	SendableChooser<Integer> robotPositionChoose;
+	int robotPosition;
+	
+	SendableChooser<String> switchPositionChoose;
+	String switchPosition;
+	
+	SendableChooser<String> autonAllianceChoose;
+	String autonAlliance;
 	
 	private auton rr;
 	
 	public Robot() 
 	{
 		//we pass a reference to ourselves
-		rr = new auton( this );
+		rr = new auton(this);
 	}
 	
 	public void runAuton() {
@@ -199,8 +215,8 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		directionL = encLeft.getDirection();
 		stoppedL = encLeft.getStopped();
 		
-		System.out.println("Left Encoder Count " + countL + " Encoder distance " + distanceL);
-		System.out.println("Right Encoder Count " + countR + " Encoder distance " + distanceR);
+		//System.out.println("Left Encoder Count " + countL + " Encoder distance " + distanceL);
+		//System.out.println("Right Encoder Count " + countR + " Encoder distance " + distanceR);
 	}
 	
 	public double getDrivePowerScale() {
@@ -288,20 +304,51 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		SmartDashboard.putNumber("Auton Cross Distance", 119.0);
 		SmartDashboard.putNumber("Auton Speed", 0.65);
 		SmartDashboard.putNumber("Inch Per Second", 38.0);
+		SmartDashboard.putNumber("Auton Wait Choose", 0.0);
 		
-		SmartDashboard.putString("Auton Mode","cross");
+		//SmartDashboard.putString("Auton Mode","cross");
 		SmartDashboard.putString("hsvThresholdHue","[0.0, 255.0]");
 		SmartDashboard.putString("hsvThresholdSaturation", "[15.0, 255.0]");
 		SmartDashboard.putString("hsvThresholdValue", "[0.0, 255.0]");
 		SmartDashboard.putString("filterContoursSolidity", "[0, 100]");
 
-		autonChoose = new SendableChooser<Integer>();
+		autonChooseLeft = new SendableChooser<>();
 		
-		autonChoose.addDefault("cross", 1);
-		autonChoose.addObject("place", 2);
-		autonChoose.addObject("exchange", 3);
+		autonChooseLeft.addDefault("cross", "cross");
+		autonChooseLeft.addObject("place", "place");
+		autonChooseLeft.addObject("exchange", "exchange");
 		
-		SmartDashboard.putData("Auton Mode", autonChoose);
+		SmartDashboard.putData("Auton Mode if left", autonChooseLeft);
+		
+		autonChooseRight = new SendableChooser<>();
+		
+		autonChooseRight.addDefault("cross", "cross");
+		autonChooseRight.addObject("place", "place");
+		autonChooseRight.addObject("exchange", "exchange");
+		
+		SmartDashboard.putData("Auton Mode if Right", autonChooseRight);
+		
+		robotPositionChoose = new SendableChooser<>();
+		
+		robotPositionChoose.addDefault("1", 1);
+		robotPositionChoose.addObject("2", 2);
+		robotPositionChoose.addObject("3", 3);
+		
+		SmartDashboard.putData("Robot Position", robotPositionChoose);
+		
+		switchPositionChoose = new SendableChooser<>();
+		
+		switchPositionChoose.addDefault("front", "front");
+		switchPositionChoose.addObject("side", "side");
+		
+		SmartDashboard.putData("Switch Position", switchPositionChoose);
+		
+		autonAllianceChoose = new SendableChooser<>();
+		
+		autonAllianceChoose.addDefault("red", "red");
+		autonAllianceChoose.addObject("blue", "blue");
+		
+		SmartDashboard.putData("Alliance", autonAllianceChoose);
 		
 		intake = new Talon(2);
 	    lowerRamp = new Talon(0);
@@ -312,17 +359,17 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	    //climberTop = new TalonSRX(8);
 	    //climberBottom = new TalonSRX(9);
 		
-		//intakeCamera.setResolution(320, 240);
+		intakeCamera.setResolution(320, 240);
 		//backCamera.setResolution(320, 240);
 		
-		//intakeOutputStream = CameraServer.getInstance().putVideo("intakeOverlay", 320, 240);
-		//intakeOutputStream.setFPS(5);
+		intakeOutputStream = CameraServer.getInstance().putVideo("intakeOverlay", 320, 240);
+		intakeOutputStream.setFPS(5);
 		
 		leftStick = new Joystick(0);
 		rightStick = new Joystick(1);
 		operatorStick = new Joystick(2);
 		
-		beamBreak = new DigitalInput(1); // todo: Real id
+		beamBreak = new DigitalInput(4); // todo: Real id
 		
 		try {
 			/***********************************************************************
@@ -419,6 +466,37 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	}
 	
 	// Auton helpers
+	@Override
+	public double getAutonWait() {
+		return autonWait;
+	}
+	
+	@Override
+	public String autonSwitchPosition() {
+		return switchPosition;
+	}
+	
+	@Override
+	public String autonSwitchSide() {
+		return switchSide;
+	}
+	
+	@Override
+	public String autonGetMode() {
+		if (switchSide == "left") {
+			return autonModeLeft;
+		} else if (switchSide == "right") {
+			return autonModeRight;
+		} else {
+			return "cross";
+		}
+	}
+	
+	@Override
+	public int autonRobotPosition() {
+		return robotPosition;
+	}
+	
 	@Override
 	public boolean autonPlaceCube_Done() {
 		return autonPlaceCubeDone;
@@ -517,13 +595,23 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	
 	@Override
 	public void autonomousInit() {
+		intakePiston.set(DoubleSolenoid.Value.kForward);
+		
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
 		
 		if (gameData.length() > 0) {
-			if (gameData.charAt(0) == 'L') {
-				switchSide = "left";
-			} else {
-				switchSide = "right";
+			if (autonAlliance == "red" ) {
+				if (gameData.charAt(0) == 'L') {
+					switchSide = "left";
+				} else {
+					switchSide = "right";
+				}
+			} else if (autonAlliance == "blue") {
+				if (gameData.charAt(2) == 'L') {
+					switchSide = "left";
+				} else {
+					switchSide = "right";
+				}
 			}
 		} else {
 			switchSide = null;
@@ -539,16 +627,18 @@ public class Robot extends IterativeRobot implements RobotInterface {
 
 		resetDistanceAndYaw();
 		
-		autonMode = autonChoose.getSelected();
-		
-		autonStep = "firstStraight";
+		autonModeLeft = autonChooseLeft.getSelected();
+		autonModeRight = autonChooseRight.getSelected();
+		robotPosition = robotPositionChoose.getSelected();
+		switchPosition = switchPositionChoose.getSelected();
+		autonAlliance = autonAllianceChoose.getSelected();
 	}
 	
 	@Override
 	public void autonomousPeriodic() {
 		driveTrainShift.set(DoubleSolenoid.Value.kOff);
 		updateEncoders();
-		
+		autonWait = SmartDashboard.getNumber("Auton Wait Choose", 0.0);
 		runAuton();
 	}
 	
@@ -579,7 +669,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	}
 	
 	public void intakeRoller(double run) {
-		if (!getBeamBreak()) {
+		//if (!getBeamBreak()) {
 			lowerRamp.set(run * 0.5);
 			intake.set(run);
 			if (run > 0.1) {
@@ -589,11 +679,11 @@ public class Robot extends IterativeRobot implements RobotInterface {
 			} else {
 				beatingStick.set(ControlMode.PercentOutput, 0);
 			}
-		} else {
+		/*} else {
 			lowerRamp.set(0);
 			intake.set(0);
 			beatingStick.set(ControlMode.PercentOutput, 0);
-		}
+		}*/
 	}
 	
 	public void intakePiston(boolean toggle) {
@@ -609,9 +699,9 @@ public class Robot extends IterativeRobot implements RobotInterface {
 			intakePiston.set(DoubleSolenoid.Value.kForward);
 		} else if (intakePistonToggle == false) {
 			intakePiston.set(DoubleSolenoid.Value.kReverse);
-		} else {
+		}/* else {
 			intakePiston.set(DoubleSolenoid.Value.kOff);
-		}
+		}*/
 	}
 	
 	public void outakeUpperRamp(double run) {
@@ -633,6 +723,8 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	
 	@Override
 	public void teleopInit() {
+		intakePiston.set(DoubleSolenoid.Value.kForward);
+		
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
 		
 		if (gameData.length() > 0) {

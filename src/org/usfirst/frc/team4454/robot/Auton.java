@@ -35,6 +35,7 @@ public class Auton {
 		String autonMode = robot.autonGetMode();
 		System.out.println(switchSide);
 		System.out.println(autonMode);
+		System.out.println(autonStep);
 		System.out.println(robotPosition);
 		switch (autonMode) {
 				case "cross": // Cross

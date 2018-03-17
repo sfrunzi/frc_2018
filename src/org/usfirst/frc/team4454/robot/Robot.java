@@ -98,9 +98,9 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	
 	boolean startStep = true;
 	
+	boolean highGear = false;
 	
-	String autonStep;
-	
+		
 	AHRS ahrs;
 	
 	TalonSRX frontLeft = new TalonSRX(1);
@@ -214,7 +214,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	}
 	
 	public double getDrivePowerScale() {
-		double scale = 1;
+		double scale = 0.75;
 		
 		if ( leftStick.getTrigger() || rightStick.getTrigger() ) {
 			scale = 0.85;
@@ -224,7 +224,11 @@ public class Robot extends IterativeRobot implements RobotInterface {
 			scale = 1;
 		}
 		
-		return scale;
+		if (!highGear) {
+			return 1;
+		} else {
+			return scale;
+		}
 	}
 	
 	/*public double getLeftUltrasonic() {
@@ -277,9 +281,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 
 	@Override
 	public void robotInit() {
-		rr = new Auton(this);
-		
-	    rearLeft.setInverted(true);
+		rearLeft.setInverted(true);
 
 		middleRight.setInverted(true);
 	    rearRight.setInverted(true);
@@ -591,6 +593,8 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	
 	@Override
 	public void autonomousInit() {
+		rr = new Auton(this);
+		
 		intakePiston.set(DoubleSolenoid.Value.kForward);
 		
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
@@ -654,11 +658,15 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		double scale = getDrivePowerScale();
 		
 		if (rightStick.getRawButton(2)) {
-			driveTrainShift.set(DoubleSolenoid.Value.kForward);
-			ptoShift.set(DoubleSolenoid.Value.kForward);
-		} else if (leftStick.getRawButton(2)) {
+			//low gear
+			highGear = false;
 			driveTrainShift.set(DoubleSolenoid.Value.kReverse);
 			ptoShift.set(DoubleSolenoid.Value.kReverse);
+		} else if (leftStick.getRawButton(2)) {
+			//high gear
+			highGear = true;
+			driveTrainShift.set(DoubleSolenoid.Value.kForward);
+			ptoShift.set(DoubleSolenoid.Value.kForward);
 		}
 		
 		adaptiveDrive(scale * (-1 * leftStick.getY()), scale * (-1 * rightStick.getY()));

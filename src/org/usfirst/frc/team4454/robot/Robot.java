@@ -33,7 +33,8 @@ import edu.wpi.first.wpilibj.vision.VisionThread;
 // PWM ID 2 -- two intake motors
 // CAN ID 9 -- front intake bar 
 public class Robot extends IterativeRobot implements RobotInterface {
-	UsbCamera intakeCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.1:1.0-video-index0");
+	UsbCamera intakeCamera = CameraServer.getInstance().startAutomaticCapture("intake", 0);
+	//UsbCamera intakeCamera = CameraServer.getInstance().startAutomaticCapture("intake", "/dev/v4l/by-path/platform-ci_hdrc.0-usb-0:1.1:1.0-video-index0");
 	CvSource intakeOutputStream;
 	VisionThread intakeVisionThread;
 	DigitalInput beamBreak;
@@ -208,6 +209,9 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		rateL = encLeft.getRate();
 		directionL = encLeft.getDirection();
 		stoppedL = encLeft.getStopped();
+		
+		SmartDashboard.putNumber("Left Encoder Count", countL);
+		SmartDashboard.putNumber("Right Encoder Count", countR);
 		
 		//System.out.println("Left Encoder Count " + countL + " Encoder distance " + distanceL);
 		//System.out.println("Right Encoder Count " + countR + " Encoder distance " + distanceR);
@@ -531,7 +535,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		if ((System.currentTimeMillis() - autonPlaceCubeTime) <= time) {
 			outakeUpperRamp(1);
 		} else {
-			outakeUpperRamp(1);
+			outakeUpperRamp(0);
 			autonPlaceCubeDone = true;
 		}
 	}
@@ -598,7 +602,9 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		rr = new Auton(this);
 		
 		intakePiston.set(DoubleSolenoid.Value.kForward);
-		ptoShift.set(DoubleSolenoid.Value.kReverse);
+		ptoShift.set(DoubleSolenoid.Value.kForward);
+		highGear = false;
+		driveTrainShift.set(DoubleSolenoid.Value.kForward);
 		
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
 		
@@ -639,7 +645,6 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	
 	@Override
 	public void autonomousPeriodic() {
-		driveTrainShift.set(DoubleSolenoid.Value.kOff);
 		updateEncoders();
 		autonWait = SmartDashboard.getNumber("Auton Wait Choose", 0.0);
 		runAuton();
@@ -651,6 +656,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		SmartDashboard.putNumber("Countour Number:", contourNumber);
 		SmartDashboard.putNumber("Running:", pipelineRunning);
 		SmartDashboard.putBoolean("Target Found:", foundTarget);
+		SmartDashboard.putBoolean("Beam Break", getBeamBreak());
 	}
 	
 	public boolean getBeamBreak(){
@@ -661,24 +667,38 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		double scale = getDrivePowerScale();
 		
 		if (rightStick.getRawButton(2)) {
-			//low gear
-			highGear = false;
+			//high gear
+			highGear = true;
 			driveTrainShift.set(DoubleSolenoid.Value.kReverse);
 			//ptoShift.set(DoubleSolenoid.Value.kReverse);
 		} else if (leftStick.getRawButton(2)) {
-			//high gear
-			highGear = true;
+			//low gear
+			highGear = false;
 			driveTrainShift.set(DoubleSolenoid.Value.kForward);
 			//ptoShift.set(DoubleSolenoid.Value.kForward);
 		}
 		
-		adaptiveDrive(scale * (-1 * leftStick.getY()), scale * (-1 * rightStick.getY()));
+		if (!leftStick.getRawButton(4) && !leftStick.getRawButton(4)) {
+			adaptiveDrive(scale * (-1 * leftStick.getY()), scale * (-1 * rightStick.getY()));
+		} else {
+			adaptiveDrive(scale * (leftStick.getY()), scale * (rightStick.getY()));
+		}
 	}
 	
 	public void intakeRoller(double run) {
 		//if (!getBeamBreak()) {
+			if (operatorStick.getRawAxis(2) >= 0.1) {
+				intake.set(1);
+			} else if (operatorStick.getRawAxis(3) >= 0.1) {
+				intake.set(-1);
+			} else if (run >= 0.1 || run <= -0.1) {
+				intake.set(run);
+			} else {
+				intake.set(0);
+			}
+			
 			lowerRamp.set(run * 0.5);
-			intake.set(run);
+			
 			if (run > 0.1) {
 				beatingStick.set(ControlMode.PercentOutput, -1);
 			} else if (run < -0.1) {
@@ -702,6 +722,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 			}
 		}
 		
+		SmartDashboard.putBoolean("Intake Piston", !intakePistonToggle);
 		if (intakePistonToggle == true) {
 			intakePiston.set(DoubleSolenoid.Value.kForward);
 		} else if (intakePistonToggle == false) {
@@ -712,7 +733,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	}
 	
 	public void outakeUpperRamp(double run) {
-		upperRamp.set(run * -0.65);
+		upperRamp.set(run * -0.40);
 	}
 	
 	public void reverseOutake(boolean run) {
@@ -722,16 +743,20 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	}
 	 
 	public void operaterController() {
-		intakeRoller(operatorStick.getRawAxis(1));
 		intakePiston(operatorStick.getRawButtonReleased(1));
-		outakeUpperRamp(operatorStick.getRawAxis(5));
 		reverseOutake(operatorStick.getRawButton(2));
+		
+		//if (!operatorStick.getRawButton(2)) {} // After rewire
+		intakeRoller(operatorStick.getRawAxis(1));
+		outakeUpperRamp(operatorStick.getRawAxis(5));
 	}
 	
 	@Override
 	public void teleopInit() {
+		System.out.println("Beam Break" + getBeamBreak());
+		
 		intakePiston.set(DoubleSolenoid.Value.kForward);
-		ptoShift.set(DoubleSolenoid.Value.kReverse);
+		ptoShift.set(DoubleSolenoid.Value.kForward);
 		
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
 		

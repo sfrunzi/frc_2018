@@ -26,7 +26,7 @@ public class Auton {
 			System.out.println("first run");
 		}
 		
-		double pivotPoint = 27;
+		double pivotPoint = 0; // 27
 		
 		String switchSide = robot.autonSwitchPosition();
 		String cubePlacement = robot.autonSwitchSide();
@@ -47,7 +47,7 @@ public class Auton {
 								System.out.println("started wait");
 							}
 							
-							if ((autonWait * 1000) <= (autonHasWait - System.currentTimeMillis())) {
+							if ((autonWait * 1000) <= (System.currentTimeMillis() - autonHasWait)) {
 								startStep = true;
 								autonStep = "firstForward";
 								System.out.println("done wait");
@@ -63,12 +63,25 @@ public class Auton {
 							
 							if (!robot.autonForward_Done()) {
 								System.out.println("moving");
-								robot.autonForward(141.5, true);// 121.5
+								robot.autonForward(151.5, true);// 121.5
+							} else {
+								robot.firstTimeAuton(true);
+								autonStep = "end";
+							}
+							break;
+						/*case "place":
+							if (!robot.autonPlaceCube_Done()) {
+								if ((robotPosition == 2 && cubePlacement == "left") || (robotPosition == 3 && cubePlacement == "right")) {
+									robot.autonPlaceCube(3000);
+									System.out.println("placing");
+								} else {
+									autonStep = "end";
+									System.out.println("ended");
+								}
 							} else {
 								autonStep = "end";
 								System.out.println("ended");
-							}
-							break;
+							}*/
 						case "end":
 							break;
 					}
@@ -89,7 +102,7 @@ public class Auton {
 										startStep = false;
 									}
 									
-									if ((autonWait * 1000) <= (autonHasWait - System.currentTimeMillis())) {
+									if ((autonWait * 1000) <= (System.currentTimeMillis() - autonHasWait)) {
 										autonStep = "firstForward";
 										startStep = true;
 									}
@@ -181,14 +194,14 @@ public class Auton {
 											robot.autonForward(50, true);
 										}
 									} else {
-										autonStep = "place";
+										autonStep = "end";
 										startStep = true;
 									}
 									
 									break;
 								case "place":
 									if (!robot.autonPlaceCube_Done()) {
-										robot.autonPlaceCube(5); // todo: correct time
+										robot.autonPlaceCube(2000); // todo: correct time
 									} else {
 										autonStep = "end";
 										startStep = true;
@@ -211,7 +224,7 @@ public class Auton {
 										startStep = false;
 									}
 									
-									if ((autonWait * 1000) <= (autonHasWait - System.currentTimeMillis())) {
+									if ((autonWait * 1000) <= (System.currentTimeMillis() - autonHasWait)) {
 										autonStep = "firstForward";
 										startStep = true;
 									}

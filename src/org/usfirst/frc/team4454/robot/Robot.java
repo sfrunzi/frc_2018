@@ -625,11 +625,26 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		rr = new Auton(this);
 		//ptoShift.set(DoubleSolenoid.Value.kForward);
 		highGear = false;
-		driveTrainShift.set(DoubleSolenoid.Value.kReverse);
 		
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
 		
 		System.out.println(gameData);
+		
+		autonCrossDistance = SmartDashboard.getNumber("Auton Cross Distance", 119.0);
+		autonSpeed = SmartDashboard.getNumber("Auton Speed", 0.65);
+		inchPerSecond = SmartDashboard.getNumber("Inch Per Second", 53.0);
+		
+		autonTurnDone = false;
+		autonTurn1Done = false;
+		firstTimeAuton = true;
+
+		resetDistanceAndYaw();
+		
+		autonModeLeft = autonChooseLeft.getSelected();
+		autonModeRight = autonChooseRight.getSelected();
+		robotPosition = robotPositionChoose.getSelected();
+		switchPosition = switchPositionChoose.getSelected();
+		autonAlliance = autonAllianceChoose.getSelected();
 		
 		if (gameData.length() > 0) {
 			if (autonAlliance == "red" ) {
@@ -648,22 +663,6 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		} else {
 			switchSide = null;
 		}
-		
-		autonCrossDistance = SmartDashboard.getNumber("Auton Cross Distance", 119.0);
-		autonSpeed = SmartDashboard.getNumber("Auton Speed", 0.65);
-		inchPerSecond = SmartDashboard.getNumber("Inch Per Second", 53.0);
-		
-		autonTurnDone = false;
-		autonTurn1Done = false;
-		firstTimeAuton = true;
-
-		resetDistanceAndYaw();
-		
-		autonModeLeft = autonChooseLeft.getSelected();
-		autonModeRight = autonChooseRight.getSelected();
-		robotPosition = robotPositionChoose.getSelected();
-		switchPosition = switchPositionChoose.getSelected();
-		autonAlliance = autonAllianceChoose.getSelected();
 	}
 	
 	@Override

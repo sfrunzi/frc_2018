@@ -32,10 +32,7 @@ public class Auton {
 		int robotPosition = robot.autonRobotPosition();
 		double autonWait = robot.getAutonWait();
 		String autonMode = robot.autonGetMode();
-		System.out.println(switchSide);
-		System.out.println(autonMode);
-		System.out.println(autonStep);
-		System.out.println(robotPosition);
+		System.out.println(autonWait);
 		switch (autonMode) {
 			case "cross": // Cross
 				switch (autonStep) {
@@ -45,7 +42,7 @@ public class Auton {
 							startStep = false;
 						}
 						
-						if ((autonWait * 1000) <= (System.currentTimeMillis() - autonHasWait)) {
+						if ((autonWait * 1000) >= (System.currentTimeMillis() - autonHasWait)) {
 							startStep = true;
 							autonStep = "firstForward";
 						}
@@ -74,6 +71,8 @@ public class Auton {
 							autonHasWait = System.currentTimeMillis();
 							startStep = false;
 						}
+						
+						System.out.println("current time: " + (System.currentTimeMillis() - autonHasWait));
 
 						if ((autonWait * 1000) <= (System.currentTimeMillis() - autonHasWait)) {
 							startStep = true;
@@ -275,7 +274,7 @@ public class Auton {
 									robot.autonForward_Reset();
 									autonStep = "firstTurn";
 									startStep = true;
-								}
+								};
 								break;
 							case "firstTurn":
 								if (!robot.autonTurn_Done()) {

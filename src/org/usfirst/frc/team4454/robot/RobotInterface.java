@@ -10,6 +10,9 @@ public interface RobotInterface {
 	int autonRobotPosition();
 	double getAutonWait();
 	String autonSwitchPosition();
+	void autonPlaceCube_Reset();
+	void autonForward_Reset();
+	void autonTurn_Reset();
 	void firstTimeAuton(boolean set);
 	void autonPlaceCube(double time);
 	void autonTurn(double turnAngle, boolean flip);

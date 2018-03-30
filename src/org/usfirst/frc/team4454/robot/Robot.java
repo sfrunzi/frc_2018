@@ -45,6 +45,10 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	
 	int pipelineRunning = 0;
 	
+	int moveX;
+	int moveY;
+	int facingO;
+	
 	int exposureValue = 10;
 	boolean exposureChanged = false;
 	
@@ -525,6 +529,21 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	}
 	
 	@Override
+	public void autonPlaceCube_Reset() {
+		autonPlaceCubeDone = false;
+	}
+	
+	@Override
+	public void autonForward_Reset() {
+		autonForwardDone = false;
+	}
+	
+	@Override
+	public void autonTurn_Reset() {
+		autonTurnDone = false;
+	}
+	
+	@Override
 	public void autonPlaceCube(double time) {
 		if (firstTimeAuton) {
 			autonPlaceCubeDone = false;
@@ -657,6 +676,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		SmartDashboard.putNumber("Running:", pipelineRunning);
 		SmartDashboard.putBoolean("Target Found:", foundTarget);
 		SmartDashboard.putBoolean("Beam Break", getBeamBreak());
+		SmartDashboard.putBoolean("Is high gear:", highGear);
 	}
 	
 	public boolean getBeamBreak(){

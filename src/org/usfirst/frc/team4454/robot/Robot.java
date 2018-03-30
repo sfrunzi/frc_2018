@@ -23,6 +23,7 @@ import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.SPI;
+import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.Talon;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -127,10 +128,10 @@ public class Robot extends IterativeRobot implements RobotInterface {
     //Ultrasonic rightUltrasonic = new Ultrasonic(2,2);
     
     DoubleSolenoid driveTrainShift = new DoubleSolenoid(0, 0, 1);
-    DoubleSolenoid ptoShift = new DoubleSolenoid(0, 4, 5);
+//    DoubleSolenoid ptoShift = new DoubleSolenoid(0, 4, 5);
     Compressor compressor = new Compressor(0);
     
-    DoubleSolenoid intakePiston = new DoubleSolenoid(0, 2, 3);
+    Solenoid intakePiston = new Solenoid(0, 5);
     
     boolean autonTurn1Done = false;
     
@@ -323,6 +324,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		autonChooseLeft.addDefault("cross", "cross");
 		autonChooseLeft.addObject("place", "place");
 		autonChooseLeft.addObject("exchange", "exchange");
+		autonChooseLeft.addObject("crossPlace", "crossPlace");
 		
 		SmartDashboard.putData("Auton Mode if left", autonChooseLeft);
 		
@@ -331,6 +333,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		autonChooseRight.addDefault("cross", "cross");
 		autonChooseRight.addObject("place", "place");
 		autonChooseRight.addObject("exchange", "exchange");
+		autonChooseRight.addObject("crossPlace", "crossPlace");
 		
 		SmartDashboard.putData("Auton Mode if Right", autonChooseRight);
 		
@@ -339,6 +342,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		robotPositionChoose.addDefault("1", 1);
 		robotPositionChoose.addObject("2", 2);
 		robotPositionChoose.addObject("3", 3);
+		robotPositionChoose.addObject("4", 4);
 		
 		SmartDashboard.putData("Robot Position", robotPositionChoose);
 		
@@ -619,13 +623,13 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	@Override
 	public void autonomousInit() {
 		rr = new Auton(this);
-		
-		intakePiston.set(DoubleSolenoid.Value.kForward);
-		ptoShift.set(DoubleSolenoid.Value.kForward);
+		//ptoShift.set(DoubleSolenoid.Value.kForward);
 		highGear = false;
-		driveTrainShift.set(DoubleSolenoid.Value.kForward);
+		driveTrainShift.set(DoubleSolenoid.Value.kReverse);
 		
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
+		
+		System.out.println(gameData);
 		
 		if (gameData.length() > 0) {
 			if (autonAlliance == "red" ) {
@@ -689,12 +693,12 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		if (rightStick.getRawButton(2)) {
 			//high gear
 			highGear = true;
-			driveTrainShift.set(DoubleSolenoid.Value.kReverse);
+			driveTrainShift.set(DoubleSolenoid.Value.kForward);
 			//ptoShift.set(DoubleSolenoid.Value.kReverse);
 		} else if (leftStick.getRawButton(2)) {
 			//low gear
 			highGear = false;
-			driveTrainShift.set(DoubleSolenoid.Value.kForward);
+			driveTrainShift.set(DoubleSolenoid.Value.kReverse);
 			//ptoShift.set(DoubleSolenoid.Value.kForward);
 		}
 		
@@ -717,7 +721,7 @@ public class Robot extends IterativeRobot implements RobotInterface {
 				intake.set(0);
 			}
 			
-			lowerRamp.set(run * 0.5);
+			lowerRamp.set( -run * 0.5);
 			
 			if (run > 0.1) {
 				beatingStick.set(ControlMode.PercentOutput, -1);
@@ -744,9 +748,9 @@ public class Robot extends IterativeRobot implements RobotInterface {
 		
 		SmartDashboard.putBoolean("Intake Piston", !intakePistonToggle);
 		if (intakePistonToggle == true) {
-			intakePiston.set(DoubleSolenoid.Value.kForward);
+			intakePiston.set(true);
 		} else if (intakePistonToggle == false) {
-			intakePiston.set(DoubleSolenoid.Value.kReverse);
+			intakePiston.set(false);
 		}/* else {
 			intakePiston.set(DoubleSolenoid.Value.kOff);
 		}*/
@@ -773,10 +777,10 @@ public class Robot extends IterativeRobot implements RobotInterface {
 	
 	@Override
 	public void teleopInit() {
+		driveTrainShift.set(DoubleSolenoid.Value.kReverse);
 		System.out.println("Beam Break" + getBeamBreak());
 		
-		intakePiston.set(DoubleSolenoid.Value.kForward);
-		ptoShift.set(DoubleSolenoid.Value.kForward);
+		//ptoShift.set(DoubleSolenoid.Value.kForward);
 		
 		gameData = DriverStation.getInstance().getGameSpecificMessage();
 		

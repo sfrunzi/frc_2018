@@ -87,7 +87,7 @@ public class Auton {
 						}
 						
 						if (!robot.autonForward_Done()) {
-							robot.autonForward(151.5, true);
+							robot.autonForward(145.5, true);
 						} else {
 							robot.firstTimeAuton(true);
 							autonStep = "place";
